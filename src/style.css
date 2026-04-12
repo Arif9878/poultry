@@ -61,6 +61,18 @@
     @apply inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50;
   }
 
+  .fab-primary {
+    @apply fixed bottom-24 right-4 z-30 inline-flex items-center gap-2 rounded-full bg-moss px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-emerald-950/20 transition hover:bg-leaf;
+  }
+
+  .fab-menu {
+    @apply fixed bottom-24 right-4 z-30 flex flex-col items-end gap-3;
+  }
+
+  .fab-subaction {
+    @apply inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-soft transition hover:bg-emerald-50;
+  }
+
   .status-pill {
     @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold;
   }
