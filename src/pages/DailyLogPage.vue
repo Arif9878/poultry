@@ -35,6 +35,8 @@ const routeFlockId = computed(() => {
   return typeof route.query.flockId === 'string' ? route.query.flockId : ''
 })
 const isStandaloneInput = computed(() => route.path.startsWith('/input'))
+const isLayer = computed(() => flock.value?.flock_type === 'layer')
+const isBroiler = computed(() => flock.value?.flock_type === 'broiler')
 
 const { form, errors, submitting, submitError, successMessage, initializeForFlock, resetForm, submit } =
   useDailyLogForm()
@@ -301,9 +303,9 @@ watch(
           </span>
         </div>
 
-        <div v-if="flock.flock_type === 'layer'" class="mt-4 grid gap-3 md:grid-cols-3">
+        <div v-if="isLayer" class="mt-4 grid gap-3 md:grid-cols-3">
           <div class="rounded-2xl bg-white/10 p-3">
-            <p class="text-xs text-emerald-100">Harga telur / kg</p>
+            <p class="text-xs text-emerald-100">Harga telur referensi</p>
             <p class="mt-1 font-semibold">{{ formatCurrency(flock.egg_price_per_kg_rp) }}</p>
           </div>
           <div class="rounded-2xl bg-white/10 p-3">
@@ -320,10 +322,40 @@ watch(
             </p>
           </div>
         </div>
+        <div v-else-if="isBroiler" class="mt-4 grid gap-3 md:grid-cols-3">
+          <div class="rounded-2xl bg-white/10 p-3">
+            <p class="text-xs text-emerald-100">Tipe input</p>
+            <p class="mt-1 font-semibold">Bobot dan sampel broiler</p>
+          </div>
+          <div class="rounded-2xl bg-white/10 p-3">
+            <p class="text-xs text-emerald-100">Fokus hari ini</p>
+            <p class="mt-1 font-semibold">Pakan, mortalitas, populasi, bobot</p>
+          </div>
+          <div class="rounded-2xl bg-white/10 p-3">
+            <p class="text-xs text-emerald-100">Catatan</p>
+            <p class="mt-1 font-semibold">Tidak perlu isi data telur</p>
+          </div>
+        </div>
       </section>
 
       <section class="surface-card">
         <form class="grid gap-4" @submit.prevent="handleSubmit">
+          <div
+            class="rounded-2xl px-4 py-3 text-sm"
+            :class="isLayer ? 'bg-amber-50 text-amber-900' : 'bg-sky-50 text-sky-900'"
+          >
+            <p class="font-semibold">
+              {{ isLayer ? 'Form ayam petelur' : 'Form ayam broiler' }}
+            </p>
+            <p class="mt-1">
+              {{
+                isLayer
+                  ? 'Isi pakan, populasi, produksi telur, dan harga telur hari ini.'
+                  : 'Isi pakan, populasi, mortalitas, serta bobot sampel broiler.'
+              }}
+            </p>
+          </div>
+
           <div class="grid gap-4 md:grid-cols-2">
             <div>
               <label class="app-label">Tanggal</label>
@@ -364,48 +396,68 @@ watch(
             </div>
           </div>
 
-          <div v-if="flock.flock_type === 'layer'" class="grid gap-4 md:grid-cols-3">
+          <div v-if="isLayer" class="space-y-4">
             <div>
-              <label class="app-label">Produksi telur (butir)</label>
-              <input v-model.number="form.egg_count" class="app-input" type="number" min="0" />
-              <p v-if="errors.egg_count" class="mt-1 text-sm text-rose-600">{{ errors.egg_count }}</p>
-            </div>
-            <div>
-              <label class="app-label">Harga telur / kg (Rp)</label>
-              <input v-model.number="form.egg_price_per_kg_rp" class="app-input" type="number" min="0" step="1" />
-              <p v-if="errors.egg_price_per_kg_rp" class="mt-1 text-sm text-rose-600">
-                {{ errors.egg_price_per_kg_rp }}
+              <p class="text-sm font-semibold text-ink">Input ayam petelur</p>
+              <p class="mt-1 text-sm text-slate-500">
+                Harga telur diisi per hari karena harga jual bisa berubah setiap hari.
               </p>
             </div>
-            <div>
-              <label class="app-label">Berat telur per butir (kg)</label>
-              <input
-                v-model.number="form.egg_weight_per_egg_kg"
-                class="app-input"
-                type="number"
-                min="0.001"
-                step="0.001"
-              />
-              <p v-if="errors.egg_weight_per_egg_kg" class="mt-1 text-sm text-rose-600">
-                {{ errors.egg_weight_per_egg_kg }}
-              </p>
+
+            <div class="grid gap-4 md:grid-cols-3">
+              <div>
+                <label class="app-label">Produksi telur (butir)</label>
+                <input v-model.number="form.egg_count" class="app-input" type="number" min="0" />
+                <p v-if="errors.egg_count" class="mt-1 text-sm text-rose-600">{{ errors.egg_count }}</p>
+              </div>
+              <div>
+                <label class="app-label">Harga telur hari ini / kg (Rp)</label>
+                <input v-model.number="form.egg_price_per_kg_rp" class="app-input" type="number" min="0" step="1" />
+                <p class="mt-1 text-xs text-slate-500">
+                  Referensi terakhir {{ formatCurrency(flock.egg_price_per_kg_rp) }}, tapi isi sesuai harga hari ini.
+                </p>
+                <p v-if="errors.egg_price_per_kg_rp" class="mt-1 text-sm text-rose-600">
+                  {{ errors.egg_price_per_kg_rp }}
+                </p>
+              </div>
+              <div>
+                <label class="app-label">Berat telur per butir (kg)</label>
+                <input
+                  v-model.number="form.egg_weight_per_egg_kg"
+                  class="app-input"
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                />
+                <p v-if="errors.egg_weight_per_egg_kg" class="mt-1 text-sm text-rose-600">
+                  {{ errors.egg_weight_per_egg_kg }}
+                </p>
+              </div>
             </div>
           </div>
-
-          <div v-else class="grid gap-4 md:grid-cols-2">
+          <div v-else-if="isBroiler" class="space-y-4">
             <div>
-              <label class="app-label">Bobot rata-rata sampel (gram)</label>
-              <input v-model.number="form.avg_weight_gram" class="app-input" type="number" min="1" />
-              <p v-if="errors.avg_weight_gram" class="mt-1 text-sm text-rose-600">
-                {{ errors.avg_weight_gram }}
+              <p class="text-sm font-semibold text-ink">Input ayam broiler</p>
+              <p class="mt-1 text-sm text-slate-500">
+                Fokus pada performa bobot dan sampel. Data telur tidak ditampilkan untuk broiler.
               </p>
             </div>
-            <div>
-              <label class="app-label">Jumlah sampel</label>
-              <input v-model.number="form.sample_count" class="app-input" type="number" min="1" />
-              <p v-if="errors.sample_count" class="mt-1 text-sm text-rose-600">
-                {{ errors.sample_count }}
-              </p>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <div>
+                <label class="app-label">Bobot rata-rata sampel (gram)</label>
+                <input v-model.number="form.avg_weight_gram" class="app-input" type="number" min="1" />
+                <p v-if="errors.avg_weight_gram" class="mt-1 text-sm text-rose-600">
+                  {{ errors.avg_weight_gram }}
+                </p>
+              </div>
+              <div>
+                <label class="app-label">Jumlah sampel</label>
+                <input v-model.number="form.sample_count" class="app-input" type="number" min="1" />
+                <p v-if="errors.sample_count" class="mt-1 text-sm text-rose-600">
+                  {{ errors.sample_count }}
+                </p>
+              </div>
             </div>
           </div>
 
