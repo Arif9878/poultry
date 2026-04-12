@@ -106,6 +106,16 @@ create table if not exists public.flocks (
   unique (farm_id, code)
 );
 
+create table if not exists public.flock_memberships (
+  id uuid primary key default gen_random_uuid(),
+  flock_id uuid not null references public.flocks (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  role text not null check (role in ('manager', 'operator')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (flock_id, user_id)
+);
+
 create table if not exists public.daily_logs (
   id uuid primary key default gen_random_uuid(),
   flock_id uuid not null references public.flocks (id) on delete cascade,
@@ -222,6 +232,8 @@ join public.flocks f on f.id = dl.flock_id
 where f.flock_type = 'layer';
 
 create index if not exists idx_farm_memberships_user_id on public.farm_memberships (user_id);
+create index if not exists idx_flock_memberships_user_id on public.flock_memberships (user_id);
+create index if not exists idx_flock_memberships_flock_id on public.flock_memberships (flock_id);
 create index if not exists idx_houses_farm_id on public.houses (farm_id);
 create index if not exists idx_flocks_farm_id on public.flocks (farm_id);
 create index if not exists idx_daily_logs_flock_id_log_date on public.daily_logs (flock_id, log_date desc);
@@ -251,6 +263,8 @@ create or replace function public.has_farm_access(target_farm_id uuid)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select
     public.is_admin()
@@ -262,12 +276,40 @@ as $$
     )
 $$;
 
+create or replace function public.has_farm_visibility(target_farm_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.has_farm_access(target_farm_id)
+    or exists (
+      select 1
+      from public.flock_memberships fm
+      join public.flocks f on f.id = fm.flock_id
+      where f.farm_id = target_farm_id
+        and fm.user_id = public.current_app_user_id()
+    )
+$$;
+
 create or replace function public.has_flock_access(target_flock_id uuid)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
-  select exists (
+  select
+    public.is_admin()
+    or exists (
+      select 1
+      from public.flock_memberships
+      where flock_id = target_flock_id
+        and user_id = public.current_app_user_id()
+    )
+    or exists (
     select 1
     from public.flocks
     where id = target_flock_id
@@ -380,6 +422,10 @@ drop trigger if exists set_farm_memberships_updated_at on public.farm_membership
 create trigger set_farm_memberships_updated_at before update on public.farm_memberships
   for each row execute procedure public.set_updated_at();
 
+drop trigger if exists set_flock_memberships_updated_at on public.flock_memberships;
+create trigger set_flock_memberships_updated_at before update on public.flock_memberships
+  for each row execute procedure public.set_updated_at();
+
 drop trigger if exists set_houses_updated_at on public.houses;
 create trigger set_houses_updated_at before update on public.houses
   for each row execute procedure public.set_updated_at();
@@ -408,6 +454,7 @@ create trigger sync_feed_item_stock
 alter table public.profiles enable row level security;
 alter table public.farms enable row level security;
 alter table public.farm_memberships enable row level security;
+alter table public.flock_memberships enable row level security;
 alter table public.houses enable row level security;
 alter table public.flocks enable row level security;
 alter table public.daily_logs enable row level security;
@@ -431,7 +478,7 @@ drop policy if exists "farms_select_accessible" on public.farms;
 create policy "farms_select_accessible"
   on public.farms
   for select
-  using (public.has_farm_access(id));
+  using (public.has_farm_visibility(id));
 
 drop policy if exists "farms_insert_manager_admin" on public.farms;
 create policy "farms_insert_manager_admin"
@@ -474,11 +521,30 @@ create policy "farm_memberships_update_admin"
   using (public.is_admin())
   with check (public.is_admin());
 
+drop policy if exists "flock_memberships_select_self_or_admin" on public.flock_memberships;
+create policy "flock_memberships_select_self_or_admin"
+  on public.flock_memberships
+  for select
+  using (user_id = public.current_app_user_id() or public.is_admin());
+
+drop policy if exists "flock_memberships_insert_admin" on public.flock_memberships;
+create policy "flock_memberships_insert_admin"
+  on public.flock_memberships
+  for insert
+  with check (public.is_admin());
+
+drop policy if exists "flock_memberships_update_admin" on public.flock_memberships;
+create policy "flock_memberships_update_admin"
+  on public.flock_memberships
+  for update
+  using (public.is_admin())
+  with check (public.is_admin());
+
 drop policy if exists "houses_select_accessible" on public.houses;
 create policy "houses_select_accessible"
   on public.houses
   for select
-  using (public.has_farm_access(farm_id));
+  using (public.has_farm_visibility(farm_id));
 
 drop policy if exists "houses_insert_manager_admin" on public.houses;
 create policy "houses_insert_manager_admin"
@@ -506,7 +572,7 @@ drop policy if exists "flocks_select_accessible" on public.flocks;
 create policy "flocks_select_accessible"
   on public.flocks
   for select
-  using (public.has_farm_access(farm_id));
+  using (public.has_flock_access(id));
 
 drop policy if exists "flocks_insert_manager_admin" on public.flocks;
 create policy "flocks_insert_manager_admin"
@@ -560,7 +626,7 @@ drop policy if exists "feed_items_select_accessible" on public.feed_items;
 create policy "feed_items_select_accessible"
   on public.feed_items
   for select
-  using (public.has_farm_access(farm_id));
+  using (public.has_farm_visibility(farm_id));
 
 drop policy if exists "feed_items_insert_manager_admin" on public.feed_items;
 create policy "feed_items_insert_manager_admin"
@@ -589,7 +655,7 @@ drop policy if exists "feed_transactions_select_accessible" on public.feed_trans
 create policy "feed_transactions_select_accessible"
   on public.feed_transactions
   for select
-  using (public.has_farm_access(farm_id));
+  using (public.has_farm_visibility(farm_id));
 
 drop policy if exists "feed_transactions_insert_manager_admin" on public.feed_transactions;
 create policy "feed_transactions_insert_manager_admin"

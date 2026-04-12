@@ -4,11 +4,6 @@ import { getCurrentSession } from './auth.service'
 import { clearCache, withCache } from './localCache.service'
 import { getProfileById } from './profiles.service'
 
-interface FarmMembershipRow {
-  role: Farm['membershipRole']
-  farm: Array<Omit<Farm, 'membershipRole'>> | null
-}
-
 async function getCurrentProfile() {
   const session = await getCurrentSession()
   if (!session) {
@@ -22,51 +17,17 @@ export async function listAccessibleFarms() {
   assertSupabaseConfigured()
   const profile = await getCurrentProfile()
 
-  if (profile.role === 'admin') {
-    return withCache('farms:admin', async () => {
-      const { data, error } = await supabase.from('farms').select('*').order('name')
-
-      if (error) {
-        throw error
-      }
-
-      return (data as Farm[]).map((farm) => ({
-        ...farm,
-        membershipRole: profile.role,
-      }))
-    })
-  }
-
   return withCache(`farms:user:${profile.id}`, async () => {
-    const { data, error } = await supabase
-      .from('farm_memberships')
-      .select(
-        `
-        role,
-        farm:farms (
-          id,
-          name,
-          location,
-          manager_name,
-          created_by,
-          created_at,
-          updated_at
-        )
-      `,
-      )
-      .eq('user_id', profile.id)
-      .order('created_at', { ascending: true })
+    const { data, error } = await supabase.from('farms').select('*').order('name')
 
     if (error) {
       throw error
     }
 
-    return (data as FarmMembershipRow[])
-      .filter((row) => row.farm?.[0])
-      .map((row) => ({
-        ...row.farm?.[0],
-        membershipRole: row.role,
-      })) as Farm[]
+    return (data as Farm[]).map((farm) => ({
+      ...farm,
+      membershipRole: profile.role,
+    }))
   })
 }
 

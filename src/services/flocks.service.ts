@@ -214,3 +214,17 @@ export async function getFlockKpis(flockId: string) {
         : null,
   } satisfies FlockKpi
 }
+
+export async function countAccessibleFlocks() {
+  assertSupabaseConfigured()
+
+  const { count, error } = await supabase
+    .from('flocks')
+    .select('id', { count: 'exact', head: true })
+
+  if (error) {
+    throw error
+  }
+
+  return count ?? 0
+}

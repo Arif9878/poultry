@@ -5,6 +5,7 @@ import AppLayout from '../components/AppLayout.vue'
 import { useAuth } from '../composables/useAuth'
 import { dataVersion, onlineStatus, syncState } from '../lib/appState'
 import { listAccessibleFarms } from '../services/farms.service'
+import { countAccessibleFlocks } from '../services/flocks.service'
 import { getPendingSyncCount, syncPendingLogs } from '../services/sync.service'
 import { formatDate } from '../utils/formatDate'
 import { formatNumber } from '../utils/formatNumber'
@@ -13,12 +14,14 @@ const router = useRouter()
 const { profile, logout } = useAuth()
 
 const farms = ref<Array<{ id: string; name: string }>>([])
+const flockCount = ref(0)
 const pendingCount = ref(0)
 
 const roleLabel = computed(() => profile.value?.role ?? '-')
 
 async function loadPage() {
   farms.value = await listAccessibleFarms()
+  flockCount.value = await countAccessibleFlocks()
   pendingCount.value = await getPendingSyncCount()
 }
 
@@ -60,6 +63,10 @@ watch([dataVersion, syncState], () => {
           <div class="rounded-3xl bg-slate-50 p-4">
             <p class="text-xs text-slate-500">Akses farm</p>
             <p class="mt-1 font-semibold text-ink">{{ formatNumber(farms.length) }} farm</p>
+          </div>
+          <div class="rounded-3xl bg-slate-50 p-4">
+            <p class="text-xs text-slate-500">Akses flock</p>
+            <p class="mt-1 font-semibold text-ink">{{ formatNumber(flockCount) }} flock</p>
           </div>
         </div>
 

@@ -136,6 +136,7 @@ Schema membuat tabel utama berikut:
 - `profiles`
 - `farms`
 - `farm_memberships`
+- `flock_memberships`
 - `houses`
 - `flocks`
 - `daily_logs`
@@ -151,7 +152,14 @@ Schema juga menambahkan:
 - trigger sinkronisasi populasi flock dari `daily_logs`
 - trigger sinkronisasi stok `feed_items` dari `feed_transactions`
 - view `layer_daily_log_metrics` untuk kalkulasi HD, FCR, kg telur, omzet, dan laba kotor
-- RLS policy berbasis role dan akses farm
+- RLS policy berbasis role, akses farm, dan akses flock
+
+## Model akses
+
+- `admin` tetap bisa akses semua data
+- `farm_memberships` memberi akses ke semua flock dalam satu farm
+- `flock_memberships` memberi akses hanya ke flock tertentu
+- satu manager/operator bisa punya beberapa row `flock_memberships`, jadi bisa akses beberapa flock sekaligus meski lintas farm
 
 ## Modul utama
 
