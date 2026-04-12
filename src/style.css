@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  body {
+    @apply m-0 bg-sand font-sans text-slate-800 antialiased;
+    background-image:
+      radial-gradient(circle at top, rgba(45, 106, 79, 0.1), transparent 28%),
+      linear-gradient(to bottom, #faf7f1, #f7f5ef);
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-3xl border border-emerald-100 bg-white p-5 shadow-soft;
+  }
+
+  .soft-card {
+    @apply rounded-3xl border border-emerald-100/70 bg-emerald-50/70 p-4;
+  }
+
+  .app-input {
+    @apply h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-moss focus:ring-4 focus:ring-emerald-100;
+  }
+
+  .app-textarea {
+    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-moss focus:ring-4 focus:ring-emerald-100;
+  }
+
+  .app-label {
+    @apply mb-2 block text-sm font-semibold text-slate-700;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-2xl bg-moss px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-leaf disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50;
+  }
+
+  .status-pill {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold;
+  }
+}
