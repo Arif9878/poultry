@@ -4,6 +4,22 @@ import type { DailyLogInput, Flock } from '../types/models'
 import { getTodayDate } from '../utils/formatDate'
 import { validateDailyLog } from '../utils/validators'
 
+function buildEmptyForm(): DailyLogInput {
+  return {
+    log_date: getTodayDate(),
+    feed_used_kg: null,
+    feed_price_per_kg_rp: null,
+    mortality_count: 0,
+    live_population: null,
+    egg_count: null,
+    egg_price_per_kg_rp: null,
+    egg_weight_per_egg_kg: null,
+    avg_weight_gram: null,
+    sample_count: null,
+    notes: '',
+  }
+}
+
 function buildInitialForm(flock: Flock): DailyLogInput {
   return {
     log_date: getTodayDate(),
@@ -23,19 +39,7 @@ function buildInitialForm(flock: Flock): DailyLogInput {
 
 export function useDailyLogForm() {
   const state = reactive({
-    form: {
-      log_date: getTodayDate(),
-      feed_used_kg: null,
-      feed_price_per_kg_rp: null,
-      mortality_count: 0,
-      live_population: null,
-      egg_count: null,
-      egg_price_per_kg_rp: null,
-      egg_weight_per_egg_kg: null,
-      avg_weight_gram: null,
-      sample_count: null,
-      notes: '',
-    } as DailyLogInput,
+    form: buildEmptyForm() as DailyLogInput,
     errors: {} as Record<string, string>,
     submitting: false,
     submitError: '',
@@ -44,6 +48,13 @@ export function useDailyLogForm() {
 
   function initializeForFlock(flock: Flock) {
     state.form = buildInitialForm(flock)
+    state.errors = {}
+    state.submitError = ''
+    state.successMessage = ''
+  }
+
+  function resetForm() {
+    state.form = buildEmptyForm()
     state.errors = {}
     state.submitError = ''
     state.successMessage = ''
@@ -82,6 +93,7 @@ export function useDailyLogForm() {
   return {
     ...toRefs(state),
     initializeForFlock,
+    resetForm,
     submit,
   }
 }

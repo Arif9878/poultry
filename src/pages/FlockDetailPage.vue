@@ -18,6 +18,7 @@ const { flock, recentLogs, trend, kpis, loading, error, loadFlockDetail } =
 
 async function loadPage() {
   await loadFlockDetail(flockId.value);
+  localStorage.setItem("lastOpenedFlockId", flockId.value);
 }
 
 onMounted(() => {
@@ -92,7 +93,7 @@ watch(dataVersion, () => {
             </div>
             <RouterLink
               class="btn-primary !py-2.5"
-              :to="`/flocks/${flock.id}/logs/new`"
+              :to="`/input?farmId=${flock.farm_id}&flockId=${flock.id}`"
             >
               Isi log hari ini
             </RouterLink>
@@ -251,7 +252,7 @@ watch(dataVersion, () => {
         />
       </section>
 
-      <RouterLink class="fab-primary" :to="`/flocks/${flock.id}/logs/new`">
+      <RouterLink class="fab-primary" :to="`/input?farmId=${flock.farm_id}&flockId=${flock.id}`">
         <span class="text-lg leading-none">+</span>
         <span>Isi riwayat harian</span>
       </RouterLink>

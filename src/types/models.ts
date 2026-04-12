@@ -90,6 +90,8 @@ export interface DashboardSummary {
   currentPopulation: number
   totalMortality: number
   totalFeedUsedKg: number
+  averageDailyFeedUsageKg: number
+  averageFeedPerBirdKg: number | null
   eggProduction: number
   latestAvgWeightGram: number | null
   activeFlockCount: number
@@ -103,6 +105,7 @@ export interface DashboardSummary {
   targetHdPercent: number | null
   maxFcr: number | null
   safetyStockDays: number | null
+  feedStockStatus: FeedStockStatus
   hdBelowTarget: boolean
   fcrAboveLimit: boolean
   feedBelowSafetyStock: boolean
@@ -192,11 +195,31 @@ export interface FeedTransaction {
   feed_item?: Pick<FeedItem, 'id' | 'name' | 'brand' | 'unit'>
 }
 
+export type FeedStockStatus = 'aman' | 'warning' | 'kritis'
+
 export interface FeedSummary {
   totalStockKg: number
+  grossStockKg: number
   lowStockCount: number
   totalItems: number
   averageFeedPricePerKgRp: number
+  totalUsedTodayKg: number
+  averageDailyUsageKg: number
+  averageFeedPerBirdKg: number | null
+  estimatedStockDays: number | null
+  stockStatus: FeedStockStatus
+}
+
+export interface FeedUsageHistoryRow {
+  id: string
+  flock_id: string
+  flock_code: string
+  flock_name: string
+  log_date: string
+  live_population: number
+  feed_used_kg: number
+  feed_per_bird_kg: number | null
+  sync_status: SyncStatus
 }
 
 export interface EggReportRow {

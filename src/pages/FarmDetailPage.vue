@@ -407,7 +407,7 @@ watch(dataVersion, () => {
               <RouterLink class="btn-primary flex-1" :to="`/flocks/${flock.id}`">
                 Detail flock
               </RouterLink>
-              <RouterLink class="btn-secondary flex-1" :to="`/flocks/${flock.id}/logs/new`">
+              <RouterLink class="btn-secondary flex-1" :to="`/input?farmId=${flock.farm_id}&flockId=${flock.id}`">
                 Isi log
               </RouterLink>
             </div>

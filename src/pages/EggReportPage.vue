@@ -91,8 +91,8 @@ watch([selectedFarmId, startDate, endDate, dataVersion], () => {
 
 <template>
   <AppLayout
-    title="Laporan Harian Telur"
-    subtitle="Pantau produksi telur layer, kg telur, FCR, dan laba kotor per hari."
+    title="Laporan telur"
+    subtitle="Pantau produksi telur layer, berat telur, FCR, dan laba harian."
   >
     <section class="surface-card">
       <div class="grid gap-4 md:grid-cols-3">

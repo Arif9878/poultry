@@ -42,8 +42,8 @@ watch(dataVersion, () => {
 
 <template>
   <AppLayout
-    title="Farm & Setup"
-    subtitle="Kelola farm yang dapat diakses, lalu lanjutkan ke kandang dan flock."
+    title="Kandang & flock"
+    subtitle="Pilih farm, buka kandang, lalu lanjut ke kelompok ayam yang ingin dicek."
   >
     <p v-if="error" class="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
       {{ error }}

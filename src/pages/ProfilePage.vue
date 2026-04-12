@@ -46,8 +46,8 @@ watch([dataVersion, syncState], () => {
 
 <template>
   <AppLayout
-    title="Profil Pengguna"
-    subtitle="Lihat role, akses farm, dan status offline sync pada akun aktif."
+    title="Profil"
+    subtitle="Lihat akun aktif, akses farm, dan status sinkronisasi."
   >
     <section class="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
       <article class="surface-card">

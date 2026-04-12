@@ -39,6 +39,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/input',
+      name: 'input',
+      component: () => import('../pages/DailyLogPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/flocks/:flockId/logs/new',
       name: 'daily-log',
       component: () => import('../pages/DailyLogPage.vue'),

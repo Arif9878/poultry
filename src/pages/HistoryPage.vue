@@ -33,8 +33,8 @@ watch(dataVersion, () => {
 
 <template>
   <AppLayout
-    title="History Log"
-    subtitle="Filter log per farm, flock, dan tanggal untuk audit operasional."
+    title="Riwayat"
+    subtitle="Lihat catatan harian berdasarkan farm, flock, dan tanggal."
   >
     <section class="surface-card">
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -68,7 +68,7 @@ watch(dataVersion, () => {
     </p>
 
     <section v-if="loading" class="surface-card text-sm text-slate-500">
-      Memuat history...
+      Memuat riwayat...
     </section>
 
     <section v-else-if="logs.length" class="space-y-4">
@@ -121,8 +121,8 @@ watch(dataVersion, () => {
 
     <EmptyState
       v-else
-      title="Belum ada data history"
-      description="Ubah filter atau isi log baru untuk melihat riwayat operasional."
-    />
+        title="Belum ada riwayat"
+        description="Ubah filter atau isi catatan harian baru untuk melihat riwayat."
+      />
   </AppLayout>
 </template>

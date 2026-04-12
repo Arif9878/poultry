@@ -50,20 +50,20 @@ watch(dataVersion, () => {
 
 <template>
   <AppLayout
-    title="Dashboard Operasional"
-    :subtitle="`Halo, ${profile?.full_name ?? 'tim farm'} — pantau KPI layer dan stok pakan farm hari ini.`"
+    title="Beranda"
+    :subtitle="`Halo, ${profile?.full_name ?? 'tim farm'} — cek telur, pakan, dan flock hari ini lebih cepat.`"
   >
     <section class="surface-card bg-gradient-to-br from-emerald-900 to-moss text-white">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
-            Ringkasan layer harian
+            Ringkasan hari ini
           </p>
           <h2 class="mt-2 text-3xl font-bold">
-            Telur, HD, FCR, laba, dan stok pakan dalam satu layar.
+            Data penting harian dalam satu layar.
           </h2>
           <p class="mt-3 max-w-2xl text-sm text-emerald-50/90">
-            Pilih farm dan tanggal untuk melihat KPI operasional serta trend 7 hari terakhir.
+            Pilih farm dan tanggal untuk melihat telur, pakan, laba, dan tren 7 hari terakhir.
           </p>
         </div>
 
@@ -124,7 +124,17 @@ watch(dataVersion, () => {
         <MetricCard
           label="Stok pakan terakhir"
           :value="`${formatDecimal(summary.lastFeedStockKg)} kg`"
-          helper="Akumulasi stok item pakan farm"
+          :helper="`Status ${summary.feedStockStatus}`"
+        />
+        <MetricCard
+          label="Rata-rata pakan harian"
+          :value="`${formatDecimal(summary.averageDailyFeedUsageKg)} kg`"
+          helper="Rata-rata dari hari yang punya log pakan"
+        />
+        <MetricCard
+          label="Konsumsi per ekor"
+          :value="summary.averageFeedPerBirdKg !== null ? `${formatDecimal(summary.averageFeedPerBirdKg * 1000, { maximumFractionDigits: 1 })} g` : '-'"
+          helper="Berdasarkan input pakan hari terpilih"
         />
         <MetricCard
           label="Perkiraan stok tersisa"
@@ -199,7 +209,7 @@ watch(dataVersion, () => {
             <RouterLink
               v-if="activeFlocks[0]"
               class="btn-secondary"
-              :to="`/flocks/${activeFlocks[0].id}/logs/new`"
+              :to="`/input?farmId=${activeFlocks[0].farm_id}&flockId=${activeFlocks[0].id}`"
             >
               Isi log flock pertama
             </RouterLink>
@@ -289,7 +299,7 @@ watch(dataVersion, () => {
               <RouterLink class="btn-primary flex-1" :to="`/flocks/${flock.id}`">
                 Detail flock
               </RouterLink>
-              <RouterLink class="btn-secondary flex-1" :to="`/flocks/${flock.id}/logs/new`">
+              <RouterLink class="btn-secondary flex-1" :to="`/input?farmId=${flock.farm_id}&flockId=${flock.id}`">
                 Isi log
               </RouterLink>
             </div>

@@ -3,7 +3,7 @@ import { assertSupabaseConfigured, supabase } from '../lib/supabase'
 import { listPendingDailyLogs } from './offlineQueue.service'
 import { listFlocksByFarm } from './flocks.service'
 import { withCache } from './localCache.service'
-import { listFeedItemsByFarm } from './feed.service'
+import { getFeedSummaryByFarm } from './feed.service'
 
 function isoDaysAgo(daysAgo: number) {
   const date = new Date()
@@ -67,6 +67,28 @@ function getPendingLogsForRange(
   )
 }
 
+function getAverageDailyFeedUsage(
+  logs: Array<{
+    log_date: string
+    feed_used_kg: number
+  }>,
+) {
+  const feedByDate = new Map<string, number>()
+
+  for (const log of logs) {
+    const isoDate = log.log_date
+    const nextTotal = (feedByDate.get(isoDate) ?? 0) + Number(log.feed_used_kg ?? 0)
+    feedByDate.set(isoDate, nextTotal)
+  }
+
+  const loggedDays = [...feedByDate.values()].filter((total) => total > 0)
+  if (!loggedDays.length) {
+    return 0
+  }
+
+  return loggedDays.reduce((sum, total) => sum + total, 0) / loggedDays.length
+}
+
 export async function getFarmDashboardSummary(
   farmId: string,
   selectedDate: string,
@@ -81,6 +103,8 @@ export async function getFarmDashboardSummary(
       currentPopulation: 0,
       totalMortality: 0,
       totalFeedUsedKg: 0,
+      averageDailyFeedUsageKg: 0,
+      averageFeedPerBirdKg: null,
       eggProduction: 0,
       latestAvgWeightGram: null,
       activeFlockCount: 0,
@@ -94,6 +118,7 @@ export async function getFarmDashboardSummary(
       targetHdPercent: null,
       maxFcr: null,
       safetyStockDays: null,
+      feedStockStatus: 'aman',
       hdBelowTarget: false,
       fcrAboveLimit: false,
       feedBelowSafetyStock: false,
@@ -104,7 +129,7 @@ export async function getFarmDashboardSummary(
   const layerFlockIds = layerFlocks.map((flock) => flock.id)
   const last7StartDate = isoDateOffset(selectedDate, -6)
 
-  const [dayLogs, latestWeightLogs, recentFeedLogs, feedItems] = await Promise.all([
+  const [dayLogs, latestWeightLogs, recentFeedLogs, feedSummary] = await Promise.all([
     withCache(`dashboard:day:${farmId}:${selectedDate}`, async () => {
       const { data, error } = await supabase
         .from('daily_logs')
@@ -159,7 +184,7 @@ export async function getFarmDashboardSummary(
 
       return data as Array<{ flock_id: string; log_date: string; feed_used_kg: number }>
     }),
-    listFeedItemsByFarm(farmId),
+    getFeedSummaryByFarm(farmId, selectedDate),
   ])
 
   const pendingDayLogs = getPendingLogsForRange(flockIds, selectedDate, selectedDate)
@@ -172,11 +197,8 @@ export async function getFarmDashboardSummary(
   ]
   const layerMetrics = summarizeLayerMetrics(layerDayLogs)
   const pendingRecentLogs = getPendingLogsForRange(flockIds, last7StartDate, selectedDate)
-  const recentFeedUsage =
-    recentFeedLogs.reduce((sum, log) => sum + Number(log.feed_used_kg ?? 0), 0) +
-    pendingRecentLogs.reduce((sum, log) => sum + Number(log.feed_used_kg ?? 0), 0)
-  const averageDailyFeedUsage = recentFeedUsage > 0 ? recentFeedUsage / 7 : 0
-  const lastFeedStockKg = feedItems.reduce((sum, item) => sum + Number(item.current_stock_kg ?? 0), 0)
+  const averageDailyFeedUsage = feedSummary.averageDailyUsageKg || getAverageDailyFeedUsage([...recentFeedLogs, ...pendingRecentLogs])
+  const lastFeedStockKg = feedSummary.totalStockKg
   const targetHdPercent =
     layerFlocks.length > 0
       ? layerFlocks.reduce((sum, flock) => sum + Number(flock.target_hd_percent ?? 0), 0) /
@@ -205,6 +227,8 @@ export async function getFarmDashboardSummary(
     totalFeedUsedKg:
       dayLogs.reduce((total, log) => total + Number(log.feed_used_kg ?? 0), 0) +
       pendingDayLogs.reduce((total, log) => total + Number(log.feed_used_kg ?? 0), 0),
+    averageDailyFeedUsageKg: feedSummary.averageDailyUsageKg,
+    averageFeedPerBirdKg: feedSummary.averageFeedPerBirdKg,
     eggProduction: layerMetrics.totalEggs,
     latestAvgWeightGram:
       latestPendingWeight?.avg_weight_gram ?? latestWeightLogs[0]?.avg_weight_gram ?? null,
@@ -219,6 +243,7 @@ export async function getFarmDashboardSummary(
     targetHdPercent,
     maxFcr,
     safetyStockDays,
+    feedStockStatus: feedSummary.stockStatus,
     hdBelowTarget:
       targetHdPercent !== null && layerMetrics.averageHdPercent < Number(targetHdPercent),
     fcrAboveLimit:

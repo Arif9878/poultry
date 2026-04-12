@@ -6,9 +6,15 @@ language plpgsql
 stable
 as $$
 declare
+  auth_user_id uuid;
   jwt_claim_sub text;
   local_user_id text;
 begin
+  auth_user_id := auth.uid();
+  if auth_user_id is not null then
+    return auth_user_id;
+  end if;
+
   jwt_claim_sub := nullif(current_setting('request.jwt.claim.sub', true), '');
   if jwt_claim_sub is not null then
     return jwt_claim_sub::uuid;
@@ -245,6 +251,8 @@ create or replace function public.current_user_role()
 returns text
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select role
   from public.profiles
@@ -255,6 +263,8 @@ create or replace function public.is_admin()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select coalesce(public.current_user_role() = 'admin', false)
 $$;
@@ -666,3 +676,114 @@ create policy "feed_transactions_insert_manager_admin"
     and created_by = public.current_app_user_id()
     and public.current_user_role() in ('admin', 'manager')
   );
+
+ create or replace function public.has_farm_access(target_farm_id uuid)
+ returns boolean
+ language sql
+ stable
+ security definer
+ set search_path = public
+ as $$
+   select
+     public.is_admin()
+     or exists (
+       select 1
+       from public.farm_memberships
+       where farm_id = target_farm_id
+         and user_id = public.current_app_user_id()
+     )
+ $$;
+ 
+ create or replace function public.has_farm_visibility(target_farm_id uuid)
+ returns boolean
+ language sql
+ stable
+ security definer
+ set search_path = public
+ as $$
+   select
+     public.has_farm_access(target_farm_id)
+     or exists (
+       select 1
+       from public.flock_memberships fm
+       join public.flocks f on f.id = fm.flock_id
+       where f.farm_id = target_farm_id
+         and fm.user_id = public.current_app_user_id()
+     )
+ $$;
+ 
+ create or replace function public.has_flock_access(target_flock_id uuid)
+ returns boolean
+ language sql
+ stable
+ security definer
+ set search_path = public
+ as $$
+   select
+     public.is_admin()
+     or exists (
+       select 1
+       from public.flock_memberships
+       where flock_id = target_flock_id
+         and user_id = public.current_app_user_id()
+     )
+     or exists (
+       select 1
+       from public.flocks
+       where id = target_flock_id
+         and public.has_farm_access(farm_id)
+     )
+ $$;
+
+
+ create or replace function public.current_user_role()
+ returns text
+ language sql
+ stable
+ security definer
+ set search_path = public
+ as $$
+   select role
+   from public.profiles
+   where id = public.current_app_user_id()
+ $$;
+ 
+ create or replace function public.is_admin()
+ returns boolean
+ language sql
+ stable
+ security definer
+ set search_path = public
+ as $$
+   select coalesce(public.current_user_role() = 'admin', false)
+ $$;
+
+  create or replace function public.current_app_user_id()
+ returns uuid
+ language plpgsql
+ stable
+ as $$
+ declare
+   auth_user_id uuid;
+   jwt_claim_sub text;
+   local_user_id text;
+ begin
+   auth_user_id := auth.uid();
+   if auth_user_id is not null then
+     return auth_user_id;
+   end if;
+ 
+   jwt_claim_sub := nullif(current_setting('request.jwt.claim.sub', true), '');
+   if jwt_claim_sub is not null then
+     return jwt_claim_sub::uuid;
+   end if;
+ 
+   local_user_id := nullif(current_setting('app.current_user_id', true), '');
+   if local_user_id is not null then
+     return local_user_id::uuid;
+   end if;
+ 
+   return null;
+ end;
+ $$;
+
