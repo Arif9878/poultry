@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import AppLayout from "../components/AppLayout.vue";
 import EmptyState from "../components/EmptyState.vue";
@@ -42,9 +42,6 @@ const summary = ref<FeedSummary>({
 });
 const loading = ref(false);
 const error = ref("");
-const showFabMenu = ref(false);
-const itemFormSection = ref<HTMLElement | null>(null);
-const transactionFormSection = ref<HTMLElement | null>(null);
 
 const itemForm = reactive({
   name: "",
