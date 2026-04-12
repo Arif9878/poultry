@@ -71,14 +71,6 @@ const selectedFeedItem = computed(
     items.value.find((item) => item.id === transactionForm.feedItemId) ?? null,
 );
 
-async function jumpToSection(section: "item" | "transaction") {
-  showFabMenu.value = false;
-  await nextTick();
-  const target =
-    section === "item" ? itemFormSection.value : transactionFormSection.value;
-  target?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 async function loadPage() {
   loading.value = true;
   error.value = "";
@@ -554,24 +546,6 @@ watch(
           description="Tambahkan item pakan pertama untuk mulai mencatat stok dan transaksi."
         />
       </section>
-
-      <!-- <div v-if="canManage" class="fab-menu">
-        <template v-if="showFabMenu">
-          <button class="fab-subaction" type="button" @click="jumpToSection('transaction')">
-            <span class="text-base leading-none">+</span>
-            <span>Transaksi pakan</span>
-          </button>
-          <button class="fab-subaction" type="button" @click="jumpToSection('item')">
-            <span class="text-base leading-none">+</span>
-            <span>Item pakan</span>
-          </button>
-        </template>
-
-        <button class="fab-primary" type="button" @click="showFabMenu = !showFabMenu">
-          <span class="text-lg leading-none">{{ showFabMenu ? 'x' : '+' }}</span>
-          <span>{{ showFabMenu ? 'Tutup' : 'Tambah data' }}</span>
-        </button>
-      </div> -->
     </template>
   </AppLayout>
 </template>
