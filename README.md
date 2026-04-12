@@ -13,6 +13,7 @@ Vue 3 + TypeScript + Tailwind app untuk monitoring operasional peternakan ayam. 
 - Form log harian untuk layer dan broiler
 - History log dengan filter farm, flock, dan tanggal
 - Offline queue untuk daily log dengan status sync
+- PWA installable untuk mobile dengan service worker auto-update
 
 ## Tech stack
 
@@ -57,6 +58,8 @@ Build production:
 ```bash
 npm run build
 ```
+
+Setelah deploy, aplikasi bisa di-install ke home screen dari browser yang mendukung PWA.
 
 ## Deploy dengan Supabase
 

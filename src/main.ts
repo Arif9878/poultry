@@ -6,6 +6,7 @@ import './style.css'
 import { useAuth } from './composables/useAuth'
 import { initializeClientState } from './lib/appState'
 import { syncPendingLogs } from './services/sync.service'
+import { registerSW } from 'virtual:pwa-register'
 
 const app = createApp(App)
 
@@ -21,3 +22,7 @@ initialize()
     app.mount('#app')
     void syncPendingLogs()
   })
+
+registerSW({
+  immediate: true,
+})
