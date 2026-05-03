@@ -42,8 +42,8 @@ watch(dataVersion, () => {
 
 <template>
   <AppLayout
-    title="Kandang & flock"
-    subtitle="Pilih farm, buka kandang, lalu lanjut ke kelompok ayam yang ingin dicek."
+    title="Peternakan & kandang"
+    subtitle="Pilih peternakan, buka kandang, lalu lanjut ke kelompok ayam yang ingin dicek."
   >
     <p v-if="error" class="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
       {{ error }}
@@ -55,9 +55,9 @@ watch(dataVersion, () => {
     >
       <div class="flex items-start justify-between gap-4">
         <div>
-          <p class="text-lg font-semibold text-ink">Tambah farm</p>
+          <p class="text-lg font-semibold text-ink">Tambah peternakan</p>
           <p class="text-sm text-slate-500">
-            Untuk MVP, admin dan manager bisa menambahkan farm baru langsung dari UI.
+            Untuk MVP, admin dan manager bisa menambahkan peternakan baru langsung dari UI.
           </p>
         </div>
         <span class="status-pill bg-emerald-100 text-emerald-700">{{ profile?.role }}</span>
@@ -65,8 +65,8 @@ watch(dataVersion, () => {
 
       <form class="mt-5 grid gap-4 md:grid-cols-3" @submit.prevent="submitFarm">
         <div>
-          <label class="app-label">Nama farm</label>
-          <input v-model="form.name" class="app-input" placeholder="Farm Sukabumi Timur" />
+          <label class="app-label">Nama peternakan</label>
+          <input v-model="form.name" class="app-input" placeholder="Peternakan Sukabumi Timur" />
         </div>
         <div>
           <label class="app-label">Lokasi</label>
@@ -77,7 +77,7 @@ watch(dataVersion, () => {
           <input v-model="form.managerName" class="app-input" placeholder="Nama manager" />
         </div>
         <div class="md:col-span-3">
-          <button class="btn-primary" type="submit">Tambah farm</button>
+          <button class="btn-primary" type="submit">Tambah peternakan</button>
         </div>
       </form>
     </section>
@@ -85,12 +85,12 @@ watch(dataVersion, () => {
     <section class="space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-lg font-semibold text-ink">Daftar farm</p>
-          <p class="text-sm text-slate-500">Klik farm untuk setup kandang dan flock.</p>
+          <p class="text-lg font-semibold text-ink">Daftar peternakan</p>
+          <p class="text-sm text-slate-500">Klik peternakan untuk setup kandang dan kelompok ayam.</p>
         </div>
       </div>
 
-      <div v-if="loading" class="surface-card text-sm text-slate-500">Memuat farm...</div>
+      <div v-if="loading" class="surface-card text-sm text-slate-500">Memuat peternakan...</div>
 
       <div v-else-if="farms.length" class="grid gap-4 lg:grid-cols-2">
         <article
@@ -113,7 +113,7 @@ watch(dataVersion, () => {
 
           <div class="mt-5 flex flex-wrap gap-3">
             <RouterLink class="btn-primary flex-1" :to="`/farms/${farm.id}`">
-              Buka farm
+              Buka peternakan
             </RouterLink>
             <RouterLink class="btn-secondary flex-1" to="/dashboard">
               Kembali ke dashboard
@@ -124,8 +124,8 @@ watch(dataVersion, () => {
 
       <EmptyState
         v-else
-        title="Belum ada farm"
-        description="Tambahkan farm baru untuk memulai setup kandang dan flock."
+        title="Belum ada peternakan"
+        description="Tambahkan peternakan baru untuk memulai setup kandang dan kelompok ayam."
       />
     </section>
   </AppLayout>

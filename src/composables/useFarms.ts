@@ -27,7 +27,7 @@ export function useFarms() {
       state.farms = await listAccessibleFarms()
     } catch (error) {
       console.error(error)
-      state.error = 'Gagal memuat daftar farm'
+      state.error = 'Gagal memuat daftar peternakan'
     } finally {
       state.loading = false
     }
@@ -49,7 +49,7 @@ export function useFarms() {
       state.flocks = flocks
     } catch (error) {
       console.error(error)
-      state.error = 'Gagal memuat detail farm'
+      state.error = 'Gagal memuat detail peternakan'
     } finally {
       state.loading = false
     }

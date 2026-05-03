@@ -8,9 +8,13 @@ import { useAuth } from "../composables/useAuth";
 import { dataVersion } from "../lib/appState";
 import {
   createFeedItem,
+  createFeedPurchase,
+  createFeedSupplier,
   createFeedTransaction,
   getFeedSummaryByFarm,
   listFeedItemsByFarm,
+  listFeedPurchasesByFarm,
+  listFeedSuppliersByFarm,
   listFeedTransactionsByFarm,
   listFeedUsageHistoryByFarm,
   normalizeFeedItemPrice,
@@ -21,10 +25,13 @@ import { listAccessibleFarms } from "../services/farms.service";
 import type {
   Farm,
   FeedItem,
+  FeedPurchase,
   FeedSummary,
+  FeedSupplier,
   FeedTransaction,
   FeedUsageHistoryRow,
 } from "../types/models";
+import { downloadCsv } from "../utils/exportCsv";
 import { getTodayDate } from "../utils/formatDate";
 import {
   formatCurrency,
@@ -38,6 +45,8 @@ const { profile } = useAuth();
 const farms = ref<Farm[]>([]);
 const selectedFarmId = ref("");
 const items = ref<FeedItem[]>([]);
+const suppliers = ref<FeedSupplier[]>([]);
+const purchases = ref<FeedPurchase[]>([]);
 const transactions = ref<FeedTransaction[]>([]);
 const usageHistory = ref<FeedUsageHistoryRow[]>([]);
 const summary = ref<FeedSummary>({
@@ -72,6 +81,25 @@ const transactionForm = reactive({
   quantityKg: 0,
   totalCostRp: null as number | null,
   transactionDate: getTodayDate(),
+  notes: "",
+});
+
+const supplierForm = reactive({
+  name: "",
+  contactName: "",
+  phone: "",
+  paymentTermDays: 14,
+  notes: "",
+});
+
+const purchaseForm = reactive({
+  supplierId: "",
+  feedItemId: "",
+  invoiceNumber: "",
+  purchaseDate: getTodayDate(),
+  quantityKg: 0,
+  totalCostRp: 0,
+  paymentDueDate: "",
   notes: "",
 });
 
@@ -110,6 +138,9 @@ const effectiveOpeningPricePerKg = computed(() => {
 
   return itemForm.pricePerKgRp;
 });
+const purchaseUnitCost = computed(() =>
+  purchaseForm.quantityKg > 0 ? purchaseForm.totalCostRp / purchaseForm.quantityKg : null,
+);
 const stockStatusLabel = computed(() => {
   switch (summary.value.stockStatus) {
     case "kritis":
@@ -147,6 +178,8 @@ async function loadPage() {
 
     if (!selectedFarmId.value) {
       items.value = [];
+      suppliers.value = [];
+      purchases.value = [];
       transactions.value = [];
       summary.value = {
         totalStockKg: 0,
@@ -164,20 +197,30 @@ async function loadPage() {
       return;
     }
 
-    const [feedItems, feedTransactions, feedSummary, feedUsageHistory] = await Promise.all([
+    const [feedItems, feedSuppliers, feedPurchases, feedTransactions, feedSummary, feedUsageHistory] = await Promise.all([
       listFeedItemsByFarm(selectedFarmId.value),
+      listFeedSuppliersByFarm(selectedFarmId.value),
+      listFeedPurchasesByFarm(selectedFarmId.value),
       listFeedTransactionsByFarm(selectedFarmId.value),
       getFeedSummaryByFarm(selectedFarmId.value),
       listFeedUsageHistoryByFarm(selectedFarmId.value),
     ]);
 
     items.value = feedItems;
+    suppliers.value = feedSuppliers;
+    purchases.value = feedPurchases;
     transactions.value = feedTransactions;
     summary.value = feedSummary;
     usageHistory.value = feedUsageHistory;
 
     if (!transactionForm.feedItemId && feedItems[0]) {
       transactionForm.feedItemId = feedItems[0].id;
+    }
+    if (!purchaseForm.feedItemId && feedItems[0]) {
+      purchaseForm.feedItemId = feedItems[0].id;
+    }
+    if (!purchaseForm.supplierId && feedSuppliers[0]) {
+      purchaseForm.supplierId = feedSuppliers[0].id;
     }
 
   } catch (nextError) {
@@ -260,6 +303,93 @@ async function submitTransaction() {
   }
 }
 
+async function submitSupplier() {
+  if (!selectedFarmId.value || !supplierForm.name.trim()) {
+    error.value = "Isi nama supplier terlebih dahulu";
+    return;
+  }
+
+  try {
+    error.value = "";
+    await createFeedSupplier({
+      farmId: selectedFarmId.value,
+      name: supplierForm.name,
+      contactName: supplierForm.contactName,
+      phone: supplierForm.phone,
+      paymentTermDays: supplierForm.paymentTermDays,
+      notes: supplierForm.notes,
+    });
+
+    supplierForm.name = "";
+    supplierForm.contactName = "";
+    supplierForm.phone = "";
+    supplierForm.paymentTermDays = 14;
+    supplierForm.notes = "";
+    await loadPage();
+  } catch (nextError) {
+    console.error(nextError);
+    error.value =
+      nextError instanceof Error ? nextError.message : "Gagal menambahkan supplier pakan";
+  }
+}
+
+async function submitPurchase() {
+  if (
+    !selectedFarmId.value ||
+    !purchaseForm.supplierId ||
+    !purchaseForm.feedItemId ||
+    purchaseForm.quantityKg <= 0 ||
+    purchaseForm.totalCostRp <= 0
+  ) {
+    error.value = "Lengkapi supplier, item pakan, qty, dan total pembelian";
+    return;
+  }
+
+  try {
+    error.value = "";
+    await createFeedPurchase({
+      farmId: selectedFarmId.value,
+      supplierId: purchaseForm.supplierId,
+      feedItemId: purchaseForm.feedItemId,
+      invoiceNumber: purchaseForm.invoiceNumber,
+      purchaseDate: purchaseForm.purchaseDate,
+      quantityKg: purchaseForm.quantityKg,
+      totalCostRp: purchaseForm.totalCostRp,
+      paymentDueDate: purchaseForm.paymentDueDate,
+      notes: purchaseForm.notes,
+    });
+
+    purchaseForm.invoiceNumber = "";
+    purchaseForm.quantityKg = 0;
+    purchaseForm.totalCostRp = 0;
+    purchaseForm.paymentDueDate = "";
+    purchaseForm.notes = "";
+    await loadPage();
+  } catch (nextError) {
+    console.error(nextError);
+    error.value =
+      nextError instanceof Error ? nextError.message : "Gagal menyimpan pembelian pakan";
+  }
+}
+
+function exportPurchases() {
+  downloadCsv(
+    "pembelian-pakan.csv",
+    ["Tanggal", "Supplier", "Item", "Invoice", "Qty kg", "Total", "Harga per kg", "Jatuh tempo", "Catatan"],
+    purchases.value.map((purchase) => [
+      purchase.purchase_date,
+      purchase.supplier?.name ?? "-",
+      purchase.feed_item?.name ?? "-",
+      purchase.invoice_number ?? "",
+      purchase.quantity_kg,
+      purchase.total_cost_rp,
+      purchase.price_per_kg_rp,
+      purchase.payment_due_date ?? "",
+      purchase.notes ?? "",
+    ]),
+  );
+}
+
 onMounted(() => {
   void loadPage();
 });
@@ -281,17 +411,20 @@ watch(
 <template>
   <AppLayout
     title="Pakan"
-    subtitle="Kelola stok pakan, harga per kg, dan transaksi gudang per farm."
+    subtitle="Kelola stok pakan, harga per kg, dan transaksi gudang per peternakan."
   >
     <section class="surface-card">
       <div class="grid gap-4 md:grid-cols-[1fr_auto]">
         <div>
-          <label class="app-label">Farm</label>
+          <label class="app-label">Peternakan</label>
           <select v-model="selectedFarmId" class="app-input">
             <option v-for="farm in farms" :key="farm.id" :value="farm.id">
               {{ farm.name }}
             </option>
           </select>
+        </div>
+        <div class="flex items-end">
+          <button class="btn-secondary" type="button" @click="exportPurchases">Export pembelian</button>
         </div>
       </div>
     </section>
@@ -357,7 +490,7 @@ watch(
             <div>
               <p class="text-lg font-semibold text-ink">Kontrol pakan harian</p>
               <p class="text-sm text-slate-500">
-                Catat stok di gudang dari menu ini, lalu input pakan dipakai lewat Input Harian per flock.
+                Catat stok di gudang dari menu ini, lalu input pakan dipakai lewat Input Harian per kandang.
               </p>
             </div>
             <span class="status-pill" :class="stockStatusClass">
@@ -423,10 +556,160 @@ watch(
       </section>
 
       <section class="grid gap-5 lg:grid-cols-2">
+        <article v-if="canManage" class="surface-card">
+          <p class="text-lg font-semibold text-ink">Supplier pakan</p>
+          <p class="text-sm text-slate-500">Catat supplier utama, kontak PIC, dan termin pembayaran.</p>
+
+          <form class="mt-5 grid gap-4" @submit.prevent="submitSupplier">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="app-label">Nama supplier</label>
+                <input v-model="supplierForm.name" class="app-input" placeholder="CV Sumber Pakan" />
+              </div>
+              <div>
+                <label class="app-label">PIC</label>
+                <input v-model="supplierForm.contactName" class="app-input" placeholder="Nama sales / admin" />
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="app-label">No. telepon</label>
+                <input v-model="supplierForm.phone" class="app-input" placeholder="08xxxxxxxxxx" />
+              </div>
+              <div>
+                <label class="app-label">Termin pembayaran (hari)</label>
+                <input v-model.number="supplierForm.paymentTermDays" class="app-input" min="0" step="1" type="number" />
+              </div>
+            </div>
+
+            <div>
+              <label class="app-label">Catatan</label>
+              <textarea v-model="supplierForm.notes" class="app-textarea" rows="3" placeholder="Alamat gudang, kebiasaan kirim, dll." />
+            </div>
+
+            <button class="btn-primary" type="submit">Tambah supplier</button>
+          </form>
+
+          <div class="mt-5 space-y-3">
+            <div v-for="supplier in suppliers" :key="supplier.id" class="rounded-3xl bg-slate-50 p-4">
+              <p class="font-semibold text-ink">{{ supplier.name }}</p>
+              <p class="text-sm text-slate-500">
+                {{ supplier.contact_name || "Tanpa PIC" }} • {{ supplier.phone || "Tanpa telepon" }}
+              </p>
+              <p class="mt-1 text-sm text-slate-600">
+                Termin {{ formatNumber(supplier.payment_term_days) }} hari
+                <span v-if="supplier.notes">• {{ supplier.notes }}</span>
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <article class="surface-card">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-lg font-semibold text-ink">Pembelian pakan</p>
+              <p class="text-sm text-slate-500">Pembelian baru otomatis menambah stok gudang dan memperbarui harga per kg.</p>
+            </div>
+            <span class="status-pill bg-sky-100 text-sky-700">purchasing</span>
+          </div>
+
+          <form v-if="canManage" class="mt-5 grid gap-4" @submit.prevent="submitPurchase">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="app-label">Supplier</label>
+                <select v-model="purchaseForm.supplierId" class="app-input">
+                  <option value="" disabled>Pilih supplier</option>
+                  <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
+                    {{ supplier.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="app-label">Item pakan</label>
+                <select v-model="purchaseForm.feedItemId" class="app-input">
+                  <option value="" disabled>Pilih item pakan</option>
+                  <option v-for="item in items" :key="item.id" :value="item.id">
+                    {{ item.name }}{{ item.brand ? ` • ${item.brand}` : "" }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="app-label">Tanggal pembelian</label>
+                <input v-model="purchaseForm.purchaseDate" class="app-input" type="date" />
+              </div>
+              <div>
+                <label class="app-label">No. invoice</label>
+                <input v-model="purchaseForm.invoiceNumber" class="app-input" placeholder="INV-2024-001" />
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label class="app-label">Qty (kg)</label>
+                <input v-model.number="purchaseForm.quantityKg" class="app-input" min="0.1" step="0.1" type="number" />
+              </div>
+              <div>
+                <label class="app-label">Total pembelian (Rp)</label>
+                <input v-model.number="purchaseForm.totalCostRp" class="app-input" min="0" step="1" type="number" />
+              </div>
+              <div>
+                <label class="app-label">Jatuh tempo</label>
+                <input v-model="purchaseForm.paymentDueDate" class="app-input" type="date" />
+              </div>
+            </div>
+
+            <div class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Harga beli / kg:
+              <span class="font-semibold text-ink">
+                {{ purchaseUnitCost !== null ? formatCurrency(purchaseUnitCost) : "-" }}
+              </span>
+            </div>
+
+            <div>
+              <label class="app-label">Catatan</label>
+              <textarea v-model="purchaseForm.notes" class="app-textarea" rows="3" placeholder="Keterangan kirim, DP, atau jadwal bayar" />
+            </div>
+
+            <button class="btn-primary" type="submit" :disabled="!suppliers.length || !items.length">
+              Simpan pembelian
+            </button>
+          </form>
+
+          <div class="mt-5 space-y-3">
+            <div v-for="purchase in purchases" :key="purchase.id" class="rounded-3xl bg-slate-50 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-semibold text-ink">
+                    {{ purchase.feed_item?.name || "-" }} • {{ purchase.supplier?.name || "-" }}
+                  </p>
+                  <p class="text-sm text-slate-500">
+                    {{ purchase.purchase_date }} • {{ formatDecimal(purchase.quantity_kg) }} kg •
+                    {{ formatCurrency(purchase.total_cost_rp) }}
+                  </p>
+                </div>
+                <span class="status-pill bg-emerald-100 text-emerald-700">
+                  {{ formatCurrency(purchase.price_per_kg_rp) }}/kg
+                </span>
+              </div>
+              <p class="mt-2 text-sm text-slate-600">
+                {{ purchase.invoice_number || "Tanpa invoice" }}
+                <span v-if="purchase.payment_due_date">• jatuh tempo {{ purchase.payment_due_date }}</span>
+                <span v-if="purchase.notes">• {{ purchase.notes }}</span>
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid gap-5 lg:grid-cols-2">
         <article v-if="canManage" ref="itemFormSection" class="surface-card">
           <p class="text-lg font-semibold text-ink">Tambah item pakan</p>
           <p class="text-sm text-slate-500">
-            Buat daftar pakan, stok awal, dan harga dasar per farm.
+            Buat daftar pakan, stok awal, dan harga dasar per peternakan.
           </p>
 
           <form class="mt-5 grid gap-4" @submit.prevent="submitItem">
@@ -685,7 +968,7 @@ watch(
           <div>
             <p class="text-lg font-semibold text-ink">Riwayat pemakaian pakan</p>
             <p class="text-sm text-slate-500">
-              Pantau pemakaian harian per flock agar konsumsi tidak boros dan mudah dicek ulang.
+               Pantau pemakaian harian per kandang agar konsumsi tidak boros dan mudah dicek ulang.
             </p>
           </div>
           <RouterLink class="btn-secondary !py-2.5" :to="selectedFarmId ? `/input?farmId=${selectedFarmId}` : '/input'">
@@ -737,7 +1020,7 @@ watch(
         <EmptyState
           v-else
           title="Belum ada pemakaian pakan"
-          description="Masuk ke Input Harian untuk mencatat pakan dipakai per flock."
+          description="Masuk ke Input Harian untuk mencatat pakan dipakai per kandang."
         />
       </section>
 

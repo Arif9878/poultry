@@ -75,7 +75,7 @@ async function submitHouse() {
 
 function validateFlockForm() {
   if (!flockForm.houseId || !flockForm.name.trim() || !flockForm.code.trim()) {
-    return 'Kandang, kode, dan nama flock wajib diisi'
+      return 'Kandang, kode, dan nama kelompok ayam wajib diisi'
   }
 
   if (flockForm.initialChickenCount <= 0) {
@@ -143,7 +143,7 @@ async function submitFlock() {
   } catch (nextError) {
     console.error(nextError)
     submitError.flock =
-      nextError instanceof Error ? nextError.message : 'Gagal menambahkan flock'
+      nextError instanceof Error ? nextError.message : 'Gagal menambahkan kandang'
   }
 }
 
@@ -158,15 +158,15 @@ watch(dataVersion, () => {
 
 <template>
   <AppLayout
-    :title="farm?.name ?? 'Detail farm'"
-    :subtitle="farm?.location ?? 'Kelola kandang dan flock dari farm ini.'"
+    :title="farm?.name ?? 'Detail peternakan'"
+    :subtitle="farm?.location ?? 'Kelola kandang dan kelompok ayam dari peternakan ini.'"
   >
     <p v-if="error" class="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
       {{ error }}
     </p>
 
     <section v-if="loading" class="surface-card text-sm text-slate-500">
-      Memuat detail farm...
+      Memuat detail peternakan...
     </section>
 
     <template v-else-if="farm">
@@ -175,7 +175,7 @@ watch(dataVersion, () => {
           <div class="flex items-start justify-between gap-4">
             <div>
               <p class="text-lg font-semibold text-ink">Kandang</p>
-              <p class="text-sm text-slate-500">Tambah house baru untuk kapasitas flock berikutnya.</p>
+              <p class="text-sm text-slate-500">Tambah house baru untuk kapasitas kandang berikutnya.</p>
             </div>
             <span class="status-pill bg-emerald-100 text-emerald-700">
               {{ formatNumber(houses.length) }} house
@@ -200,7 +200,7 @@ watch(dataVersion, () => {
           <EmptyState
             v-else
             title="Belum ada kandang"
-            description="Tambahkan kandang terlebih dahulu sebelum membuat flock."
+            description="Tambahkan kandang terlebih dahulu sebelum membuat kelompok ayam."
           />
 
           <form
@@ -230,8 +230,8 @@ watch(dataVersion, () => {
           class="surface-card"
         >
           <div>
-            <p class="text-lg font-semibold text-ink">Tambah flock</p>
-            <p class="text-sm text-slate-500">Lengkapi setting flock agar KPI layer langsung siap dipantau.</p>
+            <p class="text-lg font-semibold text-ink">Tambah kandang</p>
+            <p class="text-sm text-slate-500">Lengkapi setting kandang agar KPI layer langsung siap dipantau.</p>
           </div>
 
           <form class="mt-5 grid gap-4" @submit.prevent="submitFlock">
@@ -246,7 +246,7 @@ watch(dataVersion, () => {
                 </select>
               </div>
               <div>
-                <label class="app-label">Tipe flock</label>
+                <label class="app-label">Tipe kandang</label>
                 <select v-model="flockForm.flockType" class="app-input">
                   <option value="layer">Layer</option>
                   <option value="broiler">Broiler</option>
@@ -260,7 +260,7 @@ watch(dataVersion, () => {
                 <input v-model="flockForm.code" class="app-input" placeholder="LY-03" />
               </div>
               <div>
-                <label class="app-label">Nama flock</label>
+                <label class="app-label">Nama kandang</label>
                 <input v-model="flockForm.name" class="app-input" placeholder="Layer 30 minggu" />
               </div>
             </div>
@@ -325,7 +325,7 @@ watch(dataVersion, () => {
               <textarea
                 v-model="flockForm.notes"
                 class="app-textarea"
-                placeholder="Catatan singkat setup flock"
+                placeholder="Catatan singkat setup kandang"
                 rows="3"
               />
             </div>
@@ -333,7 +333,7 @@ watch(dataVersion, () => {
             <p v-if="submitError.flock" class="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {{ submitError.flock }}
             </p>
-            <button class="btn-primary" type="submit">Tambah flock</button>
+            <button class="btn-primary" type="submit">Tambah kandang</button>
           </form>
         </article>
       </section>
@@ -341,11 +341,13 @@ watch(dataVersion, () => {
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-lg font-semibold text-ink">Flock di farm ini</p>
-            <p class="text-sm text-slate-500">Lanjutkan ke detail flock atau langsung isi log.</p>
+            <p class="text-lg font-semibold text-ink">Kandang di peternakan ini</p>
+            <p class="text-sm text-slate-500">Lanjutkan ke detail kandang atau langsung isi log.</p>
           </div>
           <div class="flex gap-2">
             <RouterLink class="btn-secondary !py-2.5" :to="`/feed?farmId=${farm.id}`">Pakan</RouterLink>
+            <RouterLink class="btn-secondary !py-2.5" :to="`/transfers?farmId=${farm.id}`">Mutasi</RouterLink>
+            <RouterLink class="btn-secondary !py-2.5" :to="`/treatments?farmId=${farm.id}`">Treatment</RouterLink>
             <RouterLink class="btn-secondary !py-2.5" :to="`/egg-report?farmId=${farm.id}`">Telur</RouterLink>
           </div>
         </div>
@@ -405,7 +407,7 @@ watch(dataVersion, () => {
 
             <div class="mt-5 flex flex-wrap gap-3">
               <RouterLink class="btn-primary flex-1" :to="`/flocks/${flock.id}`">
-                Detail flock
+                Detail kandang
               </RouterLink>
               <RouterLink class="btn-secondary flex-1" :to="`/input?farmId=${flock.farm_id}&flockId=${flock.id}`">
                 Isi log
@@ -415,8 +417,8 @@ watch(dataVersion, () => {
         </div>
         <EmptyState
           v-else
-          title="Belum ada flock"
-          description="Tambahkan flock pertama untuk mulai mencatat feed dan performa harian."
+          title="Belum ada kandang"
+          description="Tambahkan kandang pertama untuk mulai mencatat feed dan performa harian."
         />
       </section>
     </template>

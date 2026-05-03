@@ -46,6 +46,11 @@ begin
 end;
 $$;
 
+-- ============================================================================
+-- LEGACY / BASELINE SCHEMA
+-- Core schema that existed before the MVP 2 expansion.
+-- ============================================================================
+
 create table if not exists public.profiles (
   id uuid primary key,
   full_name text not null default '',
@@ -175,6 +180,79 @@ create table if not exists public.feed_transactions (
   updated_at timestamptz not null default now()
 );
 
+-- ============================================================================
+-- MVP 2 SCHEMA ADDITIONS (NEW)
+-- New tables added for purchasing, treatment logs, and transfers.
+-- ============================================================================
+
+create table if not exists public.feed_suppliers (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references public.farms (id) on delete cascade,
+  name text not null,
+  contact_name text,
+  phone text,
+  payment_term_days integer not null default 0 check (payment_term_days >= 0),
+  notes text,
+  created_by uuid not null default public.current_app_user_id() references public.profiles (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (farm_id, name)
+);
+
+create table if not exists public.feed_purchases (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references public.farms (id) on delete cascade,
+  supplier_id uuid not null references public.feed_suppliers (id) on delete restrict,
+  feed_item_id uuid not null references public.feed_items (id) on delete restrict,
+  feed_transaction_id uuid references public.feed_transactions (id) on delete set null,
+  invoice_number text,
+  purchase_date date not null,
+  quantity_kg numeric(12, 2) not null check (quantity_kg > 0),
+  total_cost_rp numeric(14, 2) not null check (total_cost_rp >= 0),
+  price_per_kg_rp numeric(14, 2) not null check (price_per_kg_rp >= 0),
+  payment_due_date date,
+  notes text,
+  created_by uuid not null default public.current_app_user_id() references public.profiles (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.health_treatment_logs (
+  id uuid primary key default gen_random_uuid(),
+  flock_id uuid not null references public.flocks (id) on delete cascade,
+  treatment_date date not null,
+  category text not null check (category in ('vaccine', 'vitamin', 'medication', 'checkup', 'other')),
+  product_name text not null,
+  dosage text,
+  administered_by text,
+  symptoms text,
+  diagnosis text,
+  withdrawal_until date,
+  notes text,
+  created_by uuid not null default public.current_app_user_id() references public.profiles (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.flock_transfers (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references public.farms (id) on delete cascade,
+  from_flock_id uuid not null references public.flocks (id) on delete restrict,
+  to_flock_id uuid not null references public.flocks (id) on delete restrict,
+  transfer_date date not null,
+  chicken_count integer not null check (chicken_count > 0),
+  notes text,
+  created_by uuid not null default public.current_app_user_id() references public.profiles (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (from_flock_id <> to_flock_id)
+);
+
+-- ============================================================================
+-- MVP 2 COMPATIBILITY CHANGES TO EXISTING TABLES (NEW)
+-- Additive columns/backfill for the legacy tables above.
+-- ============================================================================
+
 alter table public.flocks
   add column if not exists egg_price_per_kg_rp numeric(14, 2) not null default 0,
   add column if not exists egg_weight_per_egg_kg numeric(8, 5) not null default 0.06000,
@@ -237,6 +315,11 @@ from public.daily_logs dl
 join public.flocks f on f.id = dl.flock_id
 where f.flock_type = 'layer';
 
+-- ============================================================================
+-- INDEXES
+-- Legacy indexes first, followed by MVP 2 indexes.
+-- ============================================================================
+
 create index if not exists idx_farm_memberships_user_id on public.farm_memberships (user_id);
 create index if not exists idx_flock_memberships_user_id on public.flock_memberships (user_id);
 create index if not exists idx_flock_memberships_flock_id on public.flock_memberships (flock_id);
@@ -246,6 +329,21 @@ create index if not exists idx_daily_logs_flock_id_log_date on public.daily_logs
 create index if not exists idx_feed_items_farm_id on public.feed_items (farm_id);
 create index if not exists idx_feed_transactions_farm_id_date on public.feed_transactions (farm_id, transaction_date desc);
 create index if not exists idx_feed_transactions_feed_item_id on public.feed_transactions (feed_item_id);
+
+-- MVP 2 indexes (new)
+create index if not exists idx_feed_suppliers_farm_id on public.feed_suppliers (farm_id);
+create index if not exists idx_feed_purchases_farm_id_date on public.feed_purchases (farm_id, purchase_date desc);
+create index if not exists idx_feed_purchases_supplier_id on public.feed_purchases (supplier_id);
+create index if not exists idx_feed_purchases_feed_item_id on public.feed_purchases (feed_item_id);
+create index if not exists idx_health_treatment_logs_flock_id_date on public.health_treatment_logs (flock_id, treatment_date desc);
+create index if not exists idx_flock_transfers_farm_id_date on public.flock_transfers (farm_id, transfer_date desc);
+create index if not exists idx_flock_transfers_from_flock_id on public.flock_transfers (from_flock_id);
+create index if not exists idx_flock_transfers_to_flock_id on public.flock_transfers (to_flock_id);
+
+-- ============================================================================
+-- LEGACY / BASELINE BUSINESS & ACCESS FUNCTIONS
+-- Shared business helpers and access-control helpers used by the original app.
+-- ============================================================================
 
 create or replace function public.current_user_role()
 returns text
@@ -267,6 +365,207 @@ security definer
 set search_path = public
 as $$
   select coalesce(public.current_user_role() = 'admin', false)
+$$;
+
+-- ============================================================================
+-- MVP 2 BUSINESS FUNCTIONS (NEW)
+-- Domain-specific functions introduced for transfers and feed purchasing.
+-- ============================================================================
+
+create or replace function public.create_flock_transfer(
+  p_from_flock_id uuid,
+  p_to_flock_id uuid,
+  p_transfer_date date,
+  p_chicken_count integer,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  source_flock public.flocks%rowtype;
+  destination_flock public.flocks%rowtype;
+  destination_capacity integer;
+  next_id uuid := gen_random_uuid();
+begin
+  if p_chicken_count <= 0 then
+    raise exception 'Jumlah ayam mutasi harus lebih dari 0';
+  end if;
+
+  select * into source_flock
+  from public.flocks
+  where id = p_from_flock_id;
+
+  if not found then
+    raise exception 'Kandang asal tidak ditemukan';
+  end if;
+
+  select * into destination_flock
+  from public.flocks
+  where id = p_to_flock_id;
+
+  if not found then
+    raise exception 'Kandang tujuan tidak ditemukan';
+  end if;
+
+  if source_flock.farm_id <> destination_flock.farm_id then
+    raise exception 'Mutasi hanya bisa dilakukan dalam peternakan yang sama';
+  end if;
+
+  if source_flock.flock_type <> destination_flock.flock_type then
+    raise exception 'Mutasi hanya bisa dilakukan antar kandang dengan tipe yang sama';
+  end if;
+
+  if not public.has_farm_access(source_flock.farm_id) then
+    raise exception 'Akses mutasi ditolak';
+  end if;
+
+  if source_flock.current_chicken_count < p_chicken_count then
+    raise exception 'Populasi kandang asal tidak mencukupi';
+  end if;
+
+  select capacity into destination_capacity
+  from public.houses
+  where id = destination_flock.house_id;
+
+  if destination_capacity is not null
+    and destination_flock.current_chicken_count + p_chicken_count > destination_capacity then
+    raise exception 'Mutasi melebihi kapasitas kandang tujuan';
+  end if;
+
+  update public.flocks
+  set
+    current_chicken_count = current_chicken_count - p_chicken_count,
+    updated_at = now()
+  where id = p_from_flock_id;
+
+  update public.flocks
+  set
+    current_chicken_count = current_chicken_count + p_chicken_count,
+    updated_at = now()
+  where id = p_to_flock_id;
+
+  insert into public.flock_transfers (
+    id,
+    farm_id,
+    from_flock_id,
+    to_flock_id,
+    transfer_date,
+    chicken_count,
+    notes,
+    created_by
+  ) values (
+    next_id,
+    source_flock.farm_id,
+    p_from_flock_id,
+    p_to_flock_id,
+    p_transfer_date,
+    p_chicken_count,
+    nullif(trim(coalesce(p_notes, '')), ''),
+    public.current_app_user_id()
+  );
+
+  return next_id;
+end;
+$$;
+
+create or replace function public.create_feed_purchase(
+  p_farm_id uuid,
+  p_supplier_id uuid,
+  p_feed_item_id uuid,
+  p_invoice_number text,
+  p_purchase_date date,
+  p_quantity_kg numeric,
+  p_total_cost_rp numeric,
+  p_payment_due_date date default null,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  purchase_id uuid := gen_random_uuid();
+  transaction_id uuid := gen_random_uuid();
+  normalized_price numeric(14, 2);
+begin
+  if not public.has_farm_access(p_farm_id) then
+    raise exception 'Akses pembelian ditolak';
+  end if;
+
+  if p_quantity_kg <= 0 then
+    raise exception 'Jumlah pembelian harus lebih dari 0';
+  end if;
+
+  if p_total_cost_rp < 0 then
+    raise exception 'Total biaya pembelian tidak valid';
+  end if;
+
+  normalized_price := round((p_total_cost_rp / p_quantity_kg)::numeric, 2);
+
+  insert into public.feed_transactions (
+    id,
+    feed_item_id,
+    farm_id,
+    transaction_type,
+    quantity_kg,
+    unit_cost,
+    transaction_date,
+    notes,
+    created_by
+  ) values (
+    transaction_id,
+    p_feed_item_id,
+    p_farm_id,
+    'in',
+    p_quantity_kg,
+    normalized_price,
+    p_purchase_date,
+    coalesce(nullif(trim(coalesce(p_notes, '')), ''), 'Pembelian pakan'),
+    public.current_app_user_id()
+  );
+
+  insert into public.feed_purchases (
+    id,
+    farm_id,
+    supplier_id,
+    feed_item_id,
+    feed_transaction_id,
+    invoice_number,
+    purchase_date,
+    quantity_kg,
+    total_cost_rp,
+    price_per_kg_rp,
+    payment_due_date,
+    notes,
+    created_by
+  ) values (
+    purchase_id,
+    p_farm_id,
+    p_supplier_id,
+    p_feed_item_id,
+    transaction_id,
+    nullif(trim(coalesce(p_invoice_number, '')), ''),
+    p_purchase_date,
+    p_quantity_kg,
+    p_total_cost_rp,
+    normalized_price,
+    p_payment_due_date,
+    nullif(trim(coalesce(p_notes, '')), ''),
+    public.current_app_user_id()
+  );
+
+  update public.feed_items
+  set
+    price_per_kg_rp = normalized_price,
+    updated_at = now()
+  where id = p_feed_item_id;
+
+  return purchase_id;
+end;
 $$;
 
 create or replace function public.has_farm_access(target_farm_id uuid)
@@ -456,6 +755,23 @@ drop trigger if exists set_feed_transactions_updated_at on public.feed_transacti
 create trigger set_feed_transactions_updated_at before update on public.feed_transactions
   for each row execute procedure public.set_updated_at();
 
+-- MVP 2 updated_at triggers (new)
+drop trigger if exists set_feed_suppliers_updated_at on public.feed_suppliers;
+create trigger set_feed_suppliers_updated_at before update on public.feed_suppliers
+  for each row execute procedure public.set_updated_at();
+
+drop trigger if exists set_feed_purchases_updated_at on public.feed_purchases;
+create trigger set_feed_purchases_updated_at before update on public.feed_purchases
+  for each row execute procedure public.set_updated_at();
+
+drop trigger if exists set_health_treatment_logs_updated_at on public.health_treatment_logs;
+create trigger set_health_treatment_logs_updated_at before update on public.health_treatment_logs
+  for each row execute procedure public.set_updated_at();
+
+drop trigger if exists set_flock_transfers_updated_at on public.flock_transfers;
+create trigger set_flock_transfers_updated_at before update on public.flock_transfers
+  for each row execute procedure public.set_updated_at();
+
 drop trigger if exists sync_feed_item_stock on public.feed_transactions;
 create trigger sync_feed_item_stock
   after insert or update or delete on public.feed_transactions
@@ -470,6 +786,12 @@ alter table public.flocks enable row level security;
 alter table public.daily_logs enable row level security;
 alter table public.feed_items enable row level security;
 alter table public.feed_transactions enable row level security;
+
+-- MVP 2 RLS enablement (new)
+alter table public.feed_suppliers enable row level security;
+alter table public.feed_purchases enable row level security;
+alter table public.health_treatment_logs enable row level security;
+alter table public.flock_transfers enable row level security;
 
 drop policy if exists "profiles_select_self_or_admin" on public.profiles;
 create policy "profiles_select_self_or_admin"
@@ -677,63 +999,158 @@ create policy "feed_transactions_insert_manager_admin"
     and public.current_user_role() in ('admin', 'manager')
   );
 
- create or replace function public.has_farm_access(target_farm_id uuid)
- returns boolean
- language sql
- stable
- security definer
- set search_path = public
- as $$
-   select
-     public.is_admin()
-     or exists (
-       select 1
-       from public.farm_memberships
-       where farm_id = target_farm_id
-         and user_id = public.current_app_user_id()
-     )
- $$;
- 
- create or replace function public.has_farm_visibility(target_farm_id uuid)
- returns boolean
- language sql
- stable
- security definer
- set search_path = public
- as $$
-   select
-     public.has_farm_access(target_farm_id)
-     or exists (
-       select 1
-       from public.flock_memberships fm
-       join public.flocks f on f.id = fm.flock_id
-       where f.farm_id = target_farm_id
-         and fm.user_id = public.current_app_user_id()
-     )
- $$;
- 
- create or replace function public.has_flock_access(target_flock_id uuid)
- returns boolean
- language sql
- stable
- security definer
- set search_path = public
- as $$
-   select
-     public.is_admin()
-     or exists (
-       select 1
-       from public.flock_memberships
-       where flock_id = target_flock_id
-         and user_id = public.current_app_user_id()
-     )
-     or exists (
-       select 1
-       from public.flocks
-       where id = target_flock_id
-         and public.has_farm_access(farm_id)
-     )
- $$;
+-- MVP 2 policies (new)
+drop policy if exists "feed_suppliers_select_accessible" on public.feed_suppliers;
+create policy "feed_suppliers_select_accessible"
+  on public.feed_suppliers
+  for select
+  using (public.has_farm_visibility(farm_id));
+
+drop policy if exists "feed_suppliers_insert_manager_admin" on public.feed_suppliers;
+create policy "feed_suppliers_insert_manager_admin"
+  on public.feed_suppliers
+  for insert
+  with check (
+    public.has_farm_access(farm_id)
+    and created_by = public.current_app_user_id()
+    and public.current_user_role() in ('admin', 'manager')
+  );
+
+drop policy if exists "feed_suppliers_update_manager_admin" on public.feed_suppliers;
+create policy "feed_suppliers_update_manager_admin"
+  on public.feed_suppliers
+  for update
+  using (
+    public.has_farm_access(farm_id)
+    and public.current_user_role() in ('admin', 'manager')
+  )
+  with check (
+    public.has_farm_access(farm_id)
+    and public.current_user_role() in ('admin', 'manager')
+  );
+
+drop policy if exists "feed_purchases_select_accessible" on public.feed_purchases;
+create policy "feed_purchases_select_accessible"
+  on public.feed_purchases
+  for select
+  using (public.has_farm_visibility(farm_id));
+
+drop policy if exists "feed_purchases_insert_manager_admin" on public.feed_purchases;
+create policy "feed_purchases_insert_manager_admin"
+  on public.feed_purchases
+  for insert
+  with check (
+    public.has_farm_access(farm_id)
+    and created_by = public.current_app_user_id()
+    and public.current_user_role() in ('admin', 'manager')
+  );
+
+drop policy if exists "health_treatment_logs_select_accessible" on public.health_treatment_logs;
+create policy "health_treatment_logs_select_accessible"
+  on public.health_treatment_logs
+  for select
+  using (public.has_flock_access(flock_id));
+
+drop policy if exists "health_treatment_logs_insert_accessible" on public.health_treatment_logs;
+create policy "health_treatment_logs_insert_accessible"
+  on public.health_treatment_logs
+  for insert
+  with check (
+    public.has_flock_access(flock_id)
+    and created_by = public.current_app_user_id()
+  );
+
+drop policy if exists "health_treatment_logs_update_accessible" on public.health_treatment_logs;
+create policy "health_treatment_logs_update_accessible"
+  on public.health_treatment_logs
+  for update
+  using (
+    public.has_flock_access(flock_id)
+    and (created_by = public.current_app_user_id() or public.current_user_role() in ('admin', 'manager'))
+  )
+  with check (
+    public.has_flock_access(flock_id)
+    and (created_by = public.current_app_user_id() or public.current_user_role() in ('admin', 'manager'))
+  );
+
+drop policy if exists "flock_transfers_select_accessible" on public.flock_transfers;
+create policy "flock_transfers_select_accessible"
+  on public.flock_transfers
+  for select
+  using (public.has_farm_visibility(farm_id));
+
+drop policy if exists "flock_transfers_insert_manager_admin" on public.flock_transfers;
+create policy "flock_transfers_insert_manager_admin"
+  on public.flock_transfers
+  for insert
+  with check (
+    public.has_farm_access(farm_id)
+    and created_by = public.current_app_user_id()
+    and public.current_user_role() in ('admin', 'manager')
+  );
+
+-- ============================================================================
+-- LEGACY ACCESS HELPERS RE-DECLARED
+-- Compatibility block retained from the original schema ordering.
+-- ============================================================================
+
+create or replace function public.has_farm_access(target_farm_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.is_admin()
+    or exists (
+      select 1
+      from public.farm_memberships
+      where farm_id = target_farm_id
+        and user_id = public.current_app_user_id()
+    )
+$$;
+
+create or replace function public.has_farm_visibility(target_farm_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.has_farm_access(target_farm_id)
+    or exists (
+      select 1
+      from public.flock_memberships fm
+      join public.flocks f on f.id = fm.flock_id
+      where f.farm_id = target_farm_id
+        and fm.user_id = public.current_app_user_id()
+    )
+$$;
+
+create or replace function public.has_flock_access(target_flock_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.is_admin()
+    or exists (
+      select 1
+      from public.flock_memberships
+      where flock_id = target_flock_id
+        and user_id = public.current_app_user_id()
+    )
+    or exists (
+      select 1
+      from public.flocks
+      where id = target_flock_id
+        and public.has_farm_access(farm_id)
+    )
+$$;
 
 
  create or replace function public.current_user_role()
@@ -786,4 +1203,3 @@ create policy "feed_transactions_insert_manager_admin"
    return null;
  end;
  $$;
-

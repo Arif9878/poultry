@@ -25,6 +25,43 @@ function mergePendingLogs(remoteLogs: DailyLog[], flockId: string) {
   )
 }
 
+async function getFlockBaselinePopulation(flock: Flock) {
+  const [inboundTransfers, outboundTransfers] = await Promise.all([
+    withCache(`flock-transfer-impact:in:${flock.id}`, async () => {
+      const { data, error } = await supabase
+        .from('flock_transfers')
+        .select('chicken_count')
+        .eq('to_flock_id', flock.id)
+
+      if (error) {
+        throw error
+      }
+
+      return ((data ?? []) as Array<{ chicken_count: number }>).reduce(
+        (sum, row) => sum + Number(row.chicken_count ?? 0),
+        0,
+      )
+    }),
+    withCache(`flock-transfer-impact:out:${flock.id}`, async () => {
+      const { data, error } = await supabase
+        .from('flock_transfers')
+        .select('chicken_count')
+        .eq('from_flock_id', flock.id)
+
+      if (error) {
+        throw error
+      }
+
+      return ((data ?? []) as Array<{ chicken_count: number }>).reduce(
+        (sum, row) => sum + Number(row.chicken_count ?? 0),
+        0,
+      )
+    }),
+  ])
+
+  return flock.initial_chicken_count + inboundTransfers - outboundTransfers
+}
+
 export async function listFlocksByFarm(
   farmId: string,
   status: FlockStatus | 'all' = 'all',
@@ -163,7 +200,7 @@ export async function createFlock(input: {
   )
 
   if (!createdFlock) {
-    throw new Error('Flock berhasil ditambahkan, tetapi data terbaru belum tersedia')
+    throw new Error('Kandang berhasil ditambahkan, tetapi data terbaru belum tersedia')
   }
 
   return createdFlock
@@ -176,17 +213,20 @@ export async function getFlockTrend(flockId: string, limit = 7) {
 export async function getFlockKpis(flockId: string) {
   const flock = await getFlockById(flockId)
   const logs = await getRecentLogsByFlockId(flockId, 30)
+  const baselinePopulation = await getFlockBaselinePopulation(flock)
 
   if (!logs.length) {
     return {
-      mortalityRate: 0,
+      mortalityRate:
+        baselinePopulation > 0
+          ? (Math.max(0, baselinePopulation - flock.current_chicken_count) / baselinePopulation) * 100
+          : 0,
       feedPerBird: 0,
       henDayProduction: flock.flock_type === 'layer' ? 0 : null,
       averageSampleWeight: flock.flock_type === 'broiler' ? 0 : null,
     } satisfies FlockKpi
   }
 
-  const totalMortality = logs.reduce((sum, log) => sum + log.mortality_count, 0)
   const totalFeed = logs.reduce((sum, log) => sum + log.feed_used_kg, 0)
   const latestLog = logs[0]
   const feedPerBird =
@@ -196,8 +236,8 @@ export async function getFlockKpis(flockId: string) {
 
   return {
     mortalityRate:
-      flock.initial_chicken_count > 0
-        ? (totalMortality / flock.initial_chicken_count) * 100
+      baselinePopulation > 0
+        ? (Math.max(0, baselinePopulation - flock.current_chicken_count) / baselinePopulation) * 100
         : 0,
     feedPerBird,
     henDayProduction:

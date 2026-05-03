@@ -7,9 +7,12 @@ import MetricCard from '../components/MetricCard.vue'
 import { useAuth } from '../composables/useAuth'
 import { useDashboard } from '../composables/useDashboard'
 import { dataVersion } from '../lib/appState'
+import { listAnomalyAlertsByFarm } from '../services/anomalies.service'
+import type { AnomalyAlert } from '../types/models'
 import { formatDate } from '../utils/formatDate'
 import { formatCurrency, formatDecimal, formatNumber } from '../utils/formatNumber'
 import { getFlockTypeLabel } from '../utils/flock'
+import { ref } from 'vue'
 
 const { profile } = useAuth()
 const {
@@ -22,8 +25,8 @@ const {
   loading,
   error,
   loadDashboard,
-  refreshSummary,
 } = useDashboard()
+const anomalyAlerts = ref<AnomalyAlert[]>([])
 
 const dashboardAlerts = computed(() =>
   [
@@ -39,19 +42,36 @@ const dashboardAlerts = computed(() =>
   ].filter(Boolean) as string[],
 )
 
+async function loadPage() {
+  await loadDashboard()
+  if (selectedFarmId.value) {
+    anomalyAlerts.value = await listAnomalyAlertsByFarm(selectedFarmId.value, selectedDate.value)
+  } else {
+    anomalyAlerts.value = []
+  }
+}
+
 onMounted(() => {
-  void loadDashboard()
+  void loadPage()
 })
 
 watch(dataVersion, () => {
-  void refreshSummary()
+  void loadPage()
+})
+
+watch([selectedFarmId, selectedDate], () => {
+  if (selectedFarmId.value) {
+    void listAnomalyAlertsByFarm(selectedFarmId.value, selectedDate.value).then((nextAlerts) => {
+      anomalyAlerts.value = nextAlerts
+    })
+  }
 })
 </script>
 
 <template>
   <AppLayout
     title="Beranda"
-    :subtitle="`Halo, ${profile?.full_name ?? 'tim farm'} — cek telur, pakan, dan flock hari ini lebih cepat.`"
+    :subtitle="`Halo, ${profile?.full_name ?? 'tim peternakan'} — cek telur, pakan, dan kandang hari ini lebih cepat.`"
   >
     <section class="surface-card bg-gradient-to-br from-emerald-900 to-moss text-white">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -63,14 +83,14 @@ watch(dataVersion, () => {
             Data penting harian dalam satu layar.
           </h2>
           <p class="mt-3 max-w-2xl text-sm text-emerald-50/90">
-            Pilih farm dan tanggal untuk melihat telur, pakan, laba, dan tren 7 hari terakhir.
+            Pilih peternakan dan tanggal untuk melihat telur, pakan, laba, dan tren 7 hari terakhir.
           </p>
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
-              Farm
+              Peternakan
             </label>
             <select v-model="selectedFarmId" class="app-input !border-white/10 !bg-white !text-slate-800">
               <option v-for="farm in farms" :key="farm.id" :value="farm.id">{{ farm.name }}</option>
@@ -99,7 +119,7 @@ watch(dataVersion, () => {
         <MetricCard
           label="Total telur"
           :value="`${formatNumber(summary.eggProduction)} butir`"
-          helper="Akumulasi flock layer pada tanggal terpilih"
+            helper="Akumulasi kandang layer pada tanggal terpilih"
         />
         <MetricCard
           label="Total kg telur"
@@ -109,7 +129,7 @@ watch(dataVersion, () => {
         <MetricCard
           label="Rata-rata HD%"
           :value="`${formatDecimal(summary.averageHdPercent)}%`"
-          :helper="summary.targetHdPercent !== null ? `Target ${formatDecimal(summary.targetHdPercent)}%` : 'Belum ada target flock layer'"
+           :helper="summary.targetHdPercent !== null ? `Target ${formatDecimal(summary.targetHdPercent)}%` : 'Belum ada target kandang layer'"
         />
         <MetricCard
           label="Rata-rata FCR"
@@ -143,7 +163,7 @@ watch(dataVersion, () => {
         />
         <MetricCard
           label="Status operasional"
-          :value="`${formatNumber(summary.activeFlockCount)} flock aktif`"
+          :value="`${formatNumber(summary.activeFlockCount)} kandang aktif`"
           :helper="`Pending sync ${formatNumber(summary.pendingSyncCount)} log`"
         />
       </section>
@@ -190,7 +210,7 @@ watch(dataVersion, () => {
           <EmptyState
             v-else
             title="Belum ada trend"
-            description="Tambahkan log harian untuk menampilkan trend farm."
+            description="Tambahkan log harian untuk menampilkan tren peternakan."
           />
         </article>
 
@@ -203,23 +223,26 @@ watch(dataVersion, () => {
           </div>
 
           <div class="mt-5 grid gap-3">
-            <RouterLink class="btn-primary" to="/farms">Kelola farm & flock</RouterLink>
+            <RouterLink class="btn-primary" to="/farms">Kelola peternakan & kandang</RouterLink>
             <RouterLink class="btn-secondary" to="/feed">Management pakan</RouterLink>
+            <RouterLink class="btn-secondary" to="/alerts">Anomaly alerts</RouterLink>
+            <RouterLink class="btn-secondary" :to="selectedFarmId ? `/transfers?farmId=${selectedFarmId}` : '/transfers'">Mutasi kandang</RouterLink>
+            <RouterLink class="btn-secondary" :to="selectedFarmId ? `/treatments?farmId=${selectedFarmId}` : '/treatments'">Health & treatment</RouterLink>
             <RouterLink class="btn-secondary" to="/egg-report">Laporan telur harian</RouterLink>
             <RouterLink
               v-if="activeFlocks[0]"
               class="btn-secondary"
               :to="`/input?farmId=${activeFlocks[0].farm_id}&flockId=${activeFlocks[0].id}`"
             >
-              Isi log flock pertama
+               Isi log kandang pertama
             </RouterLink>
             <RouterLink class="btn-secondary" to="/profile">Lihat profil & status sync</RouterLink>
           </div>
 
           <div class="mt-6 rounded-3xl bg-slate-50 p-4 text-sm text-slate-700">
-            <p class="font-semibold text-ink">Status farm terpilih</p>
+            <p class="font-semibold text-ink">Status peternakan terpilih</p>
             <p class="mt-2">Populasi aktif: {{ formatNumber(summary.currentPopulation) }} ekor</p>
-            <p>Mortalitas hari ini: {{ formatNumber(summary.totalMortality) }} ekor</p>
+            <p>Ayam mati hari ini: {{ formatNumber(summary.totalMortality) }} ekor</p>
             <p>Feed hari ini: {{ formatDecimal(summary.totalFeedUsedKg) }} kg</p>
           </div>
 
@@ -231,7 +254,7 @@ watch(dataVersion, () => {
             <div v-if="dashboardAlerts.length" class="mt-2 space-y-2">
               <p v-for="alert in dashboardAlerts" :key="alert">{{ alert }}</p>
             </div>
-            <p v-else class="mt-2">HD, FCR, dan stok pakan masih dalam batas target farm.</p>
+            <p v-else class="mt-2">HD, FCR, dan stok pakan masih dalam batas target peternakan.</p>
           </div>
         </article>
       </section>
@@ -239,8 +262,54 @@ watch(dataVersion, () => {
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-lg font-semibold text-ink">Flock aktif</p>
-            <p class="text-sm text-slate-500">Pilih flock untuk melihat KPI, target, dan history log.</p>
+            <p class="text-lg font-semibold text-ink">Anomaly alerts</p>
+            <p class="text-sm text-slate-500">Deteksi dini stok kritis, ayam mati tinggi, dan issue performa.</p>
+          </div>
+          <RouterLink class="btn-secondary !py-2.5" to="/alerts">Lihat semua</RouterLink>
+        </div>
+
+        <div v-if="anomalyAlerts.length" class="grid gap-4 lg:grid-cols-2">
+          <article v-for="alert in anomalyAlerts.slice(0, 4)" :key="alert.id" class="surface-card">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="font-semibold text-ink">{{ alert.title }}</p>
+                <p class="mt-1 text-sm text-slate-500">{{ alert.description }}</p>
+              </div>
+              <span
+                class="status-pill"
+                :class="
+                  alert.severity === 'critical'
+                    ? 'bg-rose-100 text-rose-700'
+                    : alert.severity === 'warning'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-sky-100 text-sky-700'
+                "
+              >
+                {{ alert.severity }}
+              </span>
+            </div>
+            <div class="mt-4 flex items-center justify-between gap-3">
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {{ alert.category }}
+              </span>
+              <RouterLink v-if="alert.action_to" class="btn-secondary !py-2.5" :to="alert.action_to">
+                {{ alert.action_label || 'Tindak lanjuti' }}
+              </RouterLink>
+            </div>
+          </article>
+        </div>
+        <EmptyState
+          v-else
+          title="Belum ada anomaly alert"
+          description="Saat ini tidak ada sinyal anomali besar pada peternakan terpilih."
+        />
+      </section>
+
+      <section class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-lg font-semibold text-ink">Kandang aktif</p>
+            <p class="text-sm text-slate-500">Pilih kandang untuk melihat KPI, target, dan history log.</p>
           </div>
           <RouterLink class="btn-secondary !py-2.5" to="/farms">Buka setup</RouterLink>
         </div>
@@ -297,7 +366,7 @@ watch(dataVersion, () => {
 
             <div class="mt-5 flex flex-wrap gap-3">
               <RouterLink class="btn-primary flex-1" :to="`/flocks/${flock.id}`">
-                Detail flock
+                Detail kandang
               </RouterLink>
               <RouterLink class="btn-secondary flex-1" :to="`/input?farmId=${flock.farm_id}&flockId=${flock.id}`">
                 Isi log
@@ -307,8 +376,8 @@ watch(dataVersion, () => {
         </div>
         <EmptyState
           v-else
-          title="Belum ada flock aktif"
-          description="Tambahkan flock baru dari halaman farm untuk mulai mencatat log harian."
+          title="Belum ada kandang aktif"
+          description="Tambahkan kandang baru dari halaman peternakan untuk mulai mencatat log harian."
         />
       </section>
     </template>

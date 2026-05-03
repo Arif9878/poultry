@@ -57,6 +57,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/alerts',
+      name: 'alerts',
+      component: () => import('../pages/AlertsPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/feed',
       name: 'feed',
       component: () => import('../pages/FeedManagementPage.vue'),
@@ -66,6 +72,18 @@ const router = createRouter({
       path: '/egg-report',
       name: 'egg-report',
       component: () => import('../pages/EggReportPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/transfers',
+      name: 'transfers',
+      component: () => import('../pages/FlockTransfersPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/treatments',
+      name: 'treatments',
+      component: () => import('../pages/HealthTreatmentsPage.vue'),
       meta: { requiresAuth: true },
     },
     {

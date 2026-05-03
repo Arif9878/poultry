@@ -8,6 +8,7 @@ import { dataVersion } from '../lib/appState'
 import { getEggReportRows, getEggReportSummary } from '../services/eggReports.service'
 import { listAccessibleFarms } from '../services/farms.service'
 import type { EggReportRow, EggReportSummary, Farm } from '../types/models'
+import { downloadCsv } from '../utils/exportCsv'
 import { getTodayDate } from '../utils/formatDate'
 import { formatCurrency, formatDecimal, formatNumber } from '../utils/formatNumber'
 
@@ -29,6 +30,25 @@ const summary = ref<EggReportSummary>({
 })
 const loading = ref(false)
 const error = ref('')
+
+function exportReport() {
+  downloadCsv(
+    'laporan-telur.csv',
+    ['Tanggal', 'Kandang', 'Kode', 'Populasi', 'Telur', 'Kg telur', 'Hen day %', 'FCR', 'Biaya pakan', 'Laba kotor'],
+    rows.value.map((row) => [
+      row.log_date,
+      row.flock_name,
+      row.flock_code,
+      row.live_population,
+      row.egg_count,
+      row.total_egg_weight_kg,
+      row.hen_day_percentage,
+      row.fcr ?? '',
+      row.feed_cost_rp,
+      row.gross_profit_rp,
+    ]),
+  )
+}
 
 async function loadPage() {
   loading.value = true
@@ -95,9 +115,9 @@ watch([selectedFarmId, startDate, endDate, dataVersion], () => {
     subtitle="Pantau produksi telur layer, berat telur, FCR, dan laba harian."
   >
     <section class="surface-card">
-      <div class="grid gap-4 md:grid-cols-3">
+      <div class="grid gap-4 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
         <div>
-          <label class="app-label">Farm</label>
+          <label class="app-label">Peternakan</label>
           <select v-model="selectedFarmId" class="app-input">
             <option v-for="farm in farms" :key="farm.id" :value="farm.id">{{ farm.name }}</option>
           </select>
@@ -109,6 +129,9 @@ watch([selectedFarmId, startDate, endDate, dataVersion], () => {
         <div>
           <label class="app-label">Sampai</label>
           <input v-model="endDate" class="app-input" type="date" />
+        </div>
+        <div class="flex items-end">
+          <button class="btn-secondary" type="button" @click="exportReport">Export CSV</button>
         </div>
       </div>
     </section>
@@ -125,8 +148,8 @@ watch([selectedFarmId, startDate, endDate, dataVersion], () => {
         <MetricCard label="Total kg telur" :value="`${formatDecimal(summary.totalEggWeightKg)} kg`" helper="Konversi butir ke kilogram" />
         <MetricCard label="Rata-rata HD%" :value="`${formatDecimal(summary.averageHenDay)}%`" helper="Rata-rata performa produksi" />
         <MetricCard label="Rata-rata FCR" :value="summary.averageFcr !== null ? formatDecimal(summary.averageFcr, { maximumFractionDigits: 3 }) : '-'" helper="Feed dibagi total kg telur" />
-        <MetricCard label="Flock pelapor" :value="formatNumber(summary.reportingFlocks)" helper="Jumlah flock layer yang mengisi laporan" />
-        <MetricCard label="Feed terpakai" :value="`${formatDecimal(summary.totalFeedKg)} kg`" helper="Feed pada flock layer terlapor" />
+        <MetricCard label="Kandang pelapor" :value="formatNumber(summary.reportingFlocks)" helper="Jumlah kandang layer yang mengisi laporan" />
+        <MetricCard label="Feed terpakai" :value="`${formatDecimal(summary.totalFeedKg)} kg`" helper="Feed pada kandang layer terlapor" />
         <MetricCard label="Total laba" :value="formatCurrency(summary.totalProfitRp)" helper="Omzet telur dikurangi biaya pakan" />
       </section>
 

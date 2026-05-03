@@ -37,6 +37,13 @@ const routeFlockId = computed(() => {
 const isStandaloneInput = computed(() => route.path.startsWith('/input'))
 const isLayer = computed(() => flock.value?.flock_type === 'layer')
 const isBroiler = computed(() => flock.value?.flock_type === 'broiler')
+const expectedLivePopulation = computed(() => {
+  if (!flock.value) {
+    return 0
+  }
+
+  return Math.max(0, flock.value.current_chicken_count - Number(form.value.mortality_count ?? 0))
+})
 
 const { form, errors, submitting, submitError, successMessage, initializeForFlock, resetForm, submit } =
   useDailyLogForm()
@@ -223,6 +230,18 @@ watch(dataVersion, () => {
 })
 
 watch(
+  [flock, () => form.value.mortality_count],
+  () => {
+    if (!flock.value) {
+      return
+    }
+
+    form.value.live_population = expectedLivePopulation.value
+  },
+  { immediate: true },
+)
+
+watch(
   () => [route.params.flockId, route.query.farmId, route.query.flockId],
   () => {
     if (!successMessage.value) {
@@ -233,7 +252,7 @@ watch(
 </script>
 
 <template>
-  <AppLayout title="Input harian" subtitle="Pilih farm dan flock, lalu isi data operasional hari ini.">
+  <AppLayout title="Input harian" subtitle="Pilih peternakan dan kandang, lalu isi data operasional hari ini.">
     <p v-if="error" class="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
       {{ error }}
     </p>
@@ -241,16 +260,16 @@ watch(
     <section class="surface-card">
       <div class="grid gap-4 md:grid-cols-2">
         <div>
-          <label class="app-label">Farm</label>
+          <label class="app-label">Peternakan</label>
           <select v-model="selectedFarmId" class="app-input" @change="handleFarmChange">
-            <option value="" disabled>Pilih farm</option>
+            <option value="" disabled>Pilih peternakan</option>
             <option v-for="farm in farms" :key="farm.id" :value="farm.id">
               {{ farm.name }}
             </option>
           </select>
         </div>
         <div>
-          <label class="app-label">Flock</label>
+          <label class="app-label">Kandang</label>
           <select
             v-model="selectedFlockId"
             class="app-input"
@@ -258,7 +277,7 @@ watch(
             @change="handleFlockChange"
           >
             <option value="" disabled>
-              {{ selectedFarmId ? 'Pilih flock' : 'Pilih farm dulu' }}
+              {{ selectedFarmId ? 'Pilih kandang' : 'Pilih peternakan dulu' }}
             </option>
             <option v-for="item in flocks" :key="item.id" :value="item.id">
               {{ item.code }} • {{ item.name }}
@@ -274,12 +293,12 @@ watch(
 
     <EmptyState
       v-else-if="selectedFarmId && !flocks.length"
-      title="Belum ada flock aktif"
-      description="Tambahkan flock aktif di farm ini dulu supaya input harian bisa dicatat."
-    />
+        title="Belum ada kandang aktif"
+        description="Tambahkan kandang aktif di peternakan ini dulu supaya input harian bisa dicatat."
+      />
 
     <section v-else-if="!flock" class="surface-card text-sm text-slate-500">
-      Pilih flock untuk mulai mengisi log harian.
+      Pilih kandang untuk mulai mengisi log harian.
     </section>
 
     <template v-else>
@@ -291,7 +310,7 @@ watch(
             </p>
             <h2 class="mt-2 text-2xl font-bold">{{ flock.name }}</h2>
             <p class="mt-1 text-sm text-emerald-50/90">
-              {{ flock.code }} • populasi {{ flock.current_chicken_count }} ekor • house {{ flock.house_name }}
+               {{ flock.code }} • populasi {{ flock.current_chicken_count }} ekor • house {{ flock.house_name }}
             </p>
           </div>
 
@@ -329,7 +348,7 @@ watch(
           </div>
           <div class="rounded-2xl bg-white/10 p-3">
             <p class="text-xs text-emerald-100">Fokus hari ini</p>
-            <p class="mt-1 font-semibold">Pakan, mortalitas, populasi, bobot</p>
+            <p class="mt-1 font-semibold">Pakan, ayam mati, populasi, bobot</p>
           </div>
           <div class="rounded-2xl bg-white/10 p-3">
             <p class="text-xs text-emerald-100">Catatan</p>
@@ -351,7 +370,7 @@ watch(
               {{
                 isLayer
                   ? 'Isi pakan, populasi, produksi telur, dan harga telur hari ini.'
-                  : 'Isi pakan, populasi, mortalitas, serta bobot sampel broiler.'
+                  : 'Isi pakan, populasi, ayam mati, serta bobot sampel broiler.'
               }}
             </p>
           </div>
@@ -364,7 +383,10 @@ watch(
             </div>
             <div>
               <label class="app-label">Populasi hidup</label>
-              <input v-model.number="form.live_population" class="app-input" type="number" min="1" />
+              <input v-model.number="form.live_population" class="app-input bg-slate-50" type="number" min="0" readonly />
+              <p class="mt-1 text-xs text-slate-500">
+                Otomatis dihitung dari populasi saat ini {{ flock.current_chicken_count }} dikurangi ayam mati.
+              </p>
               <p v-if="errors.live_population" class="mt-1 text-sm text-rose-600">
                 {{ errors.live_population }}
               </p>
@@ -388,7 +410,7 @@ watch(
               </p>
             </div>
             <div>
-              <label class="app-label">Mortalitas (ekor)</label>
+              <label class="app-label">Ayam mati (ekor)</label>
               <input v-model.number="form.mortality_count" class="app-input" type="number" min="0" />
               <p v-if="errors.mortality_count" class="mt-1 text-sm text-rose-600">
                 {{ errors.mortality_count }}

@@ -6,14 +6,26 @@ Vue 3 + TypeScript + Tailwind app untuk monitoring operasional peternakan ayam. 
 
 - Login email/password via Supabase Auth
 - Dashboard KPI layer: total telur, total kg telur, rata-rata HD%, rata-rata FCR, total laba, stok pakan terakhir, perkiraan stok tersisa
-- Setup master data: farm, kandang, dan flock
+- Setup master data: peternakan, kandang, dan membership akses
 - Management pakan: item pakan, stok awal, harga pakan/kg, transaksi masuk/keluar/adjustment
 - Laporan harian telur layer: total telur, kg telur, hen-day, FCR, biaya pakan, laba kotor
-- Detail flock dengan KPI ringkas dan riwayat log
+- Detail kandang dengan KPI ringkas dan riwayat log
 - Form log harian untuk layer dan broiler
-- History log dengan filter farm, flock, dan tanggal
+- History log dengan filter peternakan, kandang, dan tanggal
 - Offline queue untuk daily log dengan status sync
 - PWA installable untuk mobile dengan service worker auto-update
+
+## Terminologi produk
+
+Untuk copy produk dan dokumentasi bisnis:
+
+- gunakan **peternakan** untuk konteks yang sebelumnya ditulis sebagai **farm**
+- gunakan **kandang** untuk konteks yang sebelumnya ditulis sebagai **flock**
+
+Catatan:
+
+- nama tabel, field, helper, dan identifier teknis di database/kode tetap mengikuti implementasi saat ini, misalnya `farms`, `flocks`, `farm_memberships`, dan `flock_memberships`
+- jika menjelaskan schema atau API, boleh tulis format campuran seperti **peternakan (`farm`)** dan **kandang (`flock`)** agar tetap nyambung dengan nama teknis
 
 ## Tech stack
 
@@ -82,7 +94,7 @@ Mode ini adalah mode utama aplikasi saat ini.
 }
 ```
 
-4. Setelah user pertama login, tambahkan data farm, kandang, flock, dan membership.
+4. Setelah user pertama login, tambahkan data peternakan, kandang, dan membership akses.
 
 ## Deploy schema ke PostgreSQL sendiri
 
@@ -107,7 +119,7 @@ Atau:
 select set_config('app.current_user_id', '00000000-0000-0000-0000-000000000001', false);
 ```
 
-Pastikan user tersebut ada di `public.profiles`, karena role dan akses farm tetap dibaca dari:
+Pastikan user tersebut ada di `public.profiles`, karena role dan akses peternakan tetap dibaca dari:
 
 - `public.profiles`
 - `public.farm_memberships`
@@ -149,23 +161,23 @@ Schema juga menambahkan:
 - helper `public.set_local_auth_context(uuid)`
 - trigger pembuatan profile dari `auth.users` bila tersedia
 - trigger update `updated_at`
-- trigger sinkronisasi populasi flock dari `daily_logs`
+- trigger sinkronisasi populasi kandang (`flock`) dari `daily_logs`
 - trigger sinkronisasi stok `feed_items` dari `feed_transactions`
 - view `layer_daily_log_metrics` untuk kalkulasi HD, FCR, kg telur, omzet, dan laba kotor
-- RLS policy berbasis role, akses farm, dan akses flock
+- RLS policy berbasis role, akses peternakan (`farm`), dan akses kandang (`flock`)
 
 ## Model akses
 
 - `admin` tetap bisa akses semua data
-- `farm_memberships` memberi akses ke semua flock dalam satu farm
-- `flock_memberships` memberi akses hanya ke flock tertentu
-- satu manager/operator bisa punya beberapa row `flock_memberships`, jadi bisa akses beberapa flock sekaligus meski lintas farm
+- `farm_memberships` memberi akses ke semua kandang dalam satu peternakan
+- `flock_memberships` memberi akses hanya ke kandang tertentu
+- satu manager/operator bisa punya beberapa row `flock_memberships`, jadi bisa akses beberapa kandang sekaligus meski lintas peternakan
 
 ## Modul utama
 
 ### Management pakan
 
-- master item pakan per farm
+- master item pakan per peternakan
 - harga pakan / kg
 - stok pakan awal
 - transaksi pakan masuk, keluar, dan adjustment
@@ -173,8 +185,8 @@ Schema juga menambahkan:
 
 ### Laporan telur harian
 
-- filter per farm dan periode
-- hanya mengambil flock `layer`
+- filter per peternakan dan periode
+- hanya mengambil kandang tipe `layer`
 - total telur
 - total kg telur
 - hen-day
@@ -184,7 +196,7 @@ Schema juga menambahkan:
 
 ### Field layer tambahan
 
-- flock: `harga telur / kg`, `berat telur per butir`, `target HD%`, `batas FCR`, `safety stock`
+- kandang: `harga telur / kg`, `berat telur per butir`, `target HD%`, `batas FCR`, `safety stock`
 - feed item: `harga pakan / kg`, `stok pakan awal`
 - daily log: snapshot `harga pakan / kg`, `harga telur / kg`, `berat telur per butir`
 
@@ -194,6 +206,19 @@ Schema juga menambahkan:
 - saat browser offline, input daily log masuk ke local queue
 - saat online kembali, queue akan di-push ke Supabase memakai `client_request_id`
 - status `pending` dan `synced` tetap terlihat di UI
+
+## Ide MVP 2 yang bisa ditambahkan
+
+- **Mutasi antar kandang** untuk pindah populasi, afkir parsial, atau regrouping tanpa input manual yang rawan selisih
+- **Pengingat operasional** untuk vaksin, vitamin, panen, atau jadwal sampling bobot
+- **Purchasing pakan & supplier** termasuk PO sederhana, histori harga supplier, dan jatuh tempo pembayaran
+- **Batch obat dan treatment log** agar riwayat kesehatan per kandang lebih rapi
+- **Dashboard multi-peternakan** untuk owner/manager yang memantau banyak lokasi sekaligus
+- **Analitik profit per kandang dan per periode** dengan breakdown pakan, mortalitas, dan performa produksi
+- **Approval flow** untuk adjustment stok pakan atau koreksi log harian yang sensitif
+- **Ekspor laporan** ke Excel/PDF untuk operasional lapangan dan pelaporan owner
+- **Manajemen tenaga kerja / PIC kandang** untuk mencatat penanggung jawab per kandang atau shift
+- **Notifikasi low stock dan anomali performa** seperti FCR melewati batas, mortalitas naik, atau produksi telur turun
 
 ## Catatan
 

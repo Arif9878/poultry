@@ -2,6 +2,8 @@ export type UserRole = 'admin' | 'manager' | 'operator'
 export type FlockType = 'broiler' | 'layer'
 export type FlockStatus = 'active' | 'closed'
 export type SyncStatus = 'synced' | 'pending'
+export type TreatmentCategory = 'vaccine' | 'vitamin' | 'medication' | 'checkup' | 'other'
+export type AlertSeverity = 'info' | 'warning' | 'critical'
 
 export interface Profile {
   id: string
@@ -193,6 +195,84 @@ export interface FeedTransaction {
   created_at: string
   updated_at: string
   feed_item?: Pick<FeedItem, 'id' | 'name' | 'brand' | 'unit'>
+}
+
+export interface FeedSupplier {
+  id: string
+  farm_id: string
+  name: string
+  contact_name: string | null
+  phone: string | null
+  payment_term_days: number
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface FeedPurchase {
+  id: string
+  farm_id: string
+  supplier_id: string
+  feed_item_id: string
+  feed_transaction_id: string | null
+  invoice_number: string | null
+  purchase_date: string
+  quantity_kg: number
+  total_cost_rp: number
+  price_per_kg_rp: number
+  payment_due_date: string | null
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  supplier?: Pick<FeedSupplier, 'id' | 'name' | 'contact_name' | 'payment_term_days'>
+  feed_item?: Pick<FeedItem, 'id' | 'name' | 'brand' | 'unit'>
+}
+
+export interface HealthTreatmentLog {
+  id: string
+  flock_id: string
+  treatment_date: string
+  category: TreatmentCategory
+  product_name: string
+  dosage: string | null
+  administered_by: string | null
+  symptoms: string | null
+  diagnosis: string | null
+  withdrawal_until: string | null
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  flock?: Pick<Flock, 'id' | 'farm_id' | 'code' | 'name' | 'flock_type' | 'house_name'>
+}
+
+export interface FlockTransfer {
+  id: string
+  farm_id: string
+  from_flock_id: string
+  to_flock_id: string
+  transfer_date: string
+  chicken_count: number
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  from_flock?: Pick<Flock, 'id' | 'code' | 'name' | 'house_name' | 'current_chicken_count'>
+  to_flock?: Pick<Flock, 'id' | 'code' | 'name' | 'house_name' | 'current_chicken_count'>
+}
+
+export interface AnomalyAlert {
+  id: string
+  farm_id: string
+  flock_id?: string
+  category: 'feed' | 'production' | 'mortality' | 'weight' | 'treatment'
+  severity: AlertSeverity
+  title: string
+  description: string
+  action_label?: string
+  action_to?: string
 }
 
 export type FeedStockStatus = 'aman' | 'warning' | 'kritis'

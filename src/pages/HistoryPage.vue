@@ -4,6 +4,7 @@ import AppLayout from '../components/AppLayout.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useHistory } from '../composables/useHistory'
 import { dataVersion } from '../lib/appState'
+import { downloadCsv } from '../utils/exportCsv'
 import { formatDate } from '../utils/formatDate'
 import { formatDecimal, formatNumber } from '../utils/formatNumber'
 
@@ -21,6 +22,24 @@ const {
   loadFilters,
 } = useHistory()
 
+function exportHistory() {
+  downloadCsv(
+    'riwayat-harian.csv',
+    ['Tanggal', 'Kandang', 'Kode', 'Feed kg', 'Ayam mati', 'Populasi', 'Telur', 'Bobot gram', 'Catatan'],
+    logs.value.map((log) => [
+      log.log_date,
+      log.flock?.name ?? '-',
+      log.flock?.code ?? '-',
+      log.feed_used_kg,
+      log.mortality_count,
+      log.live_population,
+      log.egg_count,
+      log.avg_weight_gram ?? '',
+      log.notes ?? '',
+    ]),
+  )
+}
+
 onMounted(async () => {
   await loadFilters()
   await loadHistory()
@@ -34,21 +53,21 @@ watch(dataVersion, () => {
 <template>
   <AppLayout
     title="Riwayat"
-    subtitle="Lihat catatan harian berdasarkan farm, flock, dan tanggal."
+    subtitle="Lihat catatan harian berdasarkan peternakan, kandang, dan tanggal."
   >
     <section class="surface-card">
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <div>
-          <label class="app-label">Farm</label>
+          <label class="app-label">Peternakan</label>
           <select v-model="farmId" class="app-input">
-            <option value="">Semua farm</option>
+            <option value="">Semua peternakan</option>
             <option v-for="farm in farms" :key="farm.id" :value="farm.id">{{ farm.name }}</option>
           </select>
         </div>
         <div>
-          <label class="app-label">Flock</label>
+          <label class="app-label">Kandang</label>
           <select v-model="flockId" class="app-input">
-            <option value="">Semua flock</option>
+            <option value="">Semua kandang</option>
             <option v-for="flock in flocks" :key="flock.id" :value="flock.id">{{ flock.name }}</option>
           </select>
         </div>
@@ -59,6 +78,9 @@ watch(dataVersion, () => {
         <div>
           <label class="app-label">Sampai</label>
           <input v-model="endDate" class="app-input" type="date" />
+        </div>
+        <div class="flex items-end">
+          <button class="btn-secondary" type="button" @click="exportHistory">Export CSV</button>
         </div>
       </div>
     </section>
@@ -98,7 +120,7 @@ watch(dataVersion, () => {
             <p class="font-semibold text-ink">{{ formatDecimal(log.feed_used_kg) }} kg</p>
           </div>
           <div class="rounded-2xl bg-slate-50 p-3">
-            <p class="text-xs text-slate-500">Mortalitas</p>
+            <p class="text-xs text-slate-500">Ayam mati</p>
             <p class="font-semibold text-ink">{{ formatNumber(log.mortality_count) }} ekor</p>
           </div>
           <div class="rounded-2xl bg-slate-50 p-3">

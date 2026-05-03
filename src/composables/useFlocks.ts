@@ -41,7 +41,7 @@ export function useFlocks() {
       state.kpis = kpis
     } catch (error) {
       console.error(error)
-      state.error = 'Gagal memuat detail flock'
+      state.error = 'Gagal memuat detail kandang'
     } finally {
       state.loading = false
     }

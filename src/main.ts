@@ -6,7 +6,6 @@ import './style.css'
 import { useAuth } from './composables/useAuth'
 import { initializeClientState } from './lib/appState'
 import { syncPendingLogs } from './services/sync.service'
-import { registerSW } from 'virtual:pwa-register'
 
 const app = createApp(App)
 
@@ -23,6 +22,21 @@ initialize()
     void syncPendingLogs()
   })
 
-registerSW({
-  immediate: true,
-})
+function setupPwa() {
+  if (import.meta.env.PROD) {
+    void import('virtual:pwa-register').then(({ registerSW }) => {
+      registerSW({
+        immediate: true,
+      })
+    })
+    return
+  }
+
+  if ('serviceWorker' in navigator) {
+    void navigator.serviceWorker.getRegistrations().then((registrations) =>
+      Promise.all(registrations.map((registration) => registration.unregister())),
+    )
+  }
+}
+
+setupPwa()

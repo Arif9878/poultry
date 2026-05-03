@@ -87,7 +87,7 @@ export function useDashboard() {
       localStorage.setItem('selectedFarmId', state.selectedFarmId)
     } catch (error) {
       console.error(error)
-      state.error = 'Gagal memuat ringkasan farm'
+      state.error = 'Gagal memuat ringkasan peternakan'
     } finally {
       state.loading = false
     }

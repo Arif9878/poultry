@@ -121,6 +121,7 @@ const secondaryNavItems = computed<NavItem[]>(() => {
     return [
       { label: 'Pakan', to: '/feed', icon: 'feed', active: false },
       { label: 'Laporan telur', to: '/egg-report', icon: 'egg', active: false },
+      { label: 'Alerts', to: '/alerts', icon: 'history', active: false },
       { label: 'Kandang', to: '/farms', icon: 'barn', active: false },
     ]
   }
@@ -129,14 +130,16 @@ const secondaryNavItems = computed<NavItem[]>(() => {
     return [
       { label: 'Beranda', to: '/dashboard', icon: 'home', active: false },
       { label: 'Pakan', to: '/feed', icon: 'feed', active: isRouteActive(['/feed']) },
+      { label: 'Alerts', to: '/alerts', icon: 'history', active: isRouteActive(['/alerts']) },
       { label: 'Laporan telur', to: '/egg-report', icon: 'egg', active: false },
     ]
   }
 
-  if (isRouteActive(['/history', '/egg-report'])) {
+  if (isRouteActive(['/history', '/egg-report', '/alerts', '/transfers', '/treatments'])) {
     return [
       { label: 'Beranda', to: '/dashboard', icon: 'home', active: false },
       { label: 'Laporan telur', to: '/egg-report', icon: 'egg', active: isRouteActive(['/egg-report']) },
+      { label: 'Alerts', to: '/alerts', icon: 'history', active: isRouteActive(['/alerts']) },
       { label: 'Kandang', to: '/farms', icon: 'barn', active: false },
     ]
   }

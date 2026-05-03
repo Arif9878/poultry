@@ -47,7 +47,7 @@ watch([dataVersion, syncState], () => {
 <template>
   <AppLayout
     title="Profil"
-    subtitle="Lihat akun aktif, akses farm, dan status sinkronisasi."
+    subtitle="Lihat akun aktif, akses peternakan, dan status sinkronisasi."
   >
     <section class="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
       <article class="surface-card">
@@ -61,12 +61,12 @@ watch([dataVersion, syncState], () => {
             <p class="mt-1 font-semibold text-ink">{{ profile?.phone || '-' }}</p>
           </div>
           <div class="rounded-3xl bg-slate-50 p-4">
-            <p class="text-xs text-slate-500">Akses farm</p>
-            <p class="mt-1 font-semibold text-ink">{{ formatNumber(farms.length) }} farm</p>
+            <p class="text-xs text-slate-500">Akses peternakan</p>
+            <p class="mt-1 font-semibold text-ink">{{ formatNumber(farms.length) }} peternakan</p>
           </div>
           <div class="rounded-3xl bg-slate-50 p-4">
-            <p class="text-xs text-slate-500">Akses flock</p>
-            <p class="mt-1 font-semibold text-ink">{{ formatNumber(flockCount) }} flock</p>
+            <p class="text-xs text-slate-500">Akses kandang</p>
+            <p class="mt-1 font-semibold text-ink">{{ formatNumber(flockCount) }} kandang</p>
           </div>
         </div>
 
@@ -100,7 +100,7 @@ watch([dataVersion, syncState], () => {
         </div>
 
         <div class="mt-6 rounded-3xl bg-emerald-50 p-4">
-          <p class="text-sm font-semibold text-ink">Farm yang bisa diakses</p>
+          <p class="text-sm font-semibold text-ink">Peternakan yang bisa diakses</p>
           <div class="mt-3 space-y-2">
             <div
               v-for="farm in farms"

@@ -32,11 +32,11 @@ watch(dataVersion, () => {
 
 <template>
   <AppLayout
-    :title="flock?.name ?? 'Detail flock'"
+    :title="flock?.name ?? 'Detail kandang'"
     :subtitle="
       flock
         ? `${getFlockTypeLabel(flock.flock_type)} • ${flock.house_name} • umur ${getFlockAgeInDays(flock.start_date)} hari`
-        : 'Memuat data flock...'
+        : 'Memuat data kandang...'
     "
   >
     <p
@@ -47,15 +47,15 @@ watch(dataVersion, () => {
     </p>
 
     <section v-if="loading" class="surface-card text-sm text-slate-500">
-      Memuat detail flock...
+      Memuat detail kandang...
     </section>
 
     <template v-else-if="flock">
       <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Mortality rate"
+          label="Ayam mati"
           :value="`${formatDecimal(kpis.mortalityRate, { maximumFractionDigits: 2 })}%`"
-          helper="Akumulasi vs populasi awal"
+          helper="Selisih baseline populasi vs populasi hidup saat ini"
         />
         <MetricCard
           label="Feed per bird"
@@ -88,7 +88,7 @@ watch(dataVersion, () => {
             <div>
               <p class="text-lg font-semibold text-ink">Trend 7 hari</p>
               <p class="text-sm text-slate-500">
-                Feed, mortalitas, dan metrik spesifik flock.
+                Feed, ayam mati, dan metrik spesifik kandang.
               </p>
             </div>
             <RouterLink
@@ -128,7 +128,7 @@ watch(dataVersion, () => {
                   </p>
                 </div>
                 <div>
-                  <p class="text-xs text-slate-500">Mortalitas</p>
+                  <p class="text-xs text-slate-500">Ayam mati</p>
                   <p class="font-semibold text-ink">
                     {{ formatNumber(item.mortality_count) }}
                   </p>
@@ -151,12 +151,22 @@ watch(dataVersion, () => {
           <EmptyState
             v-else
             title="Belum ada trend"
-            description="Isi log pertama untuk melihat pergerakan harian flock."
+             description="Isi log pertama untuk melihat pergerakan harian kandang."
           />
         </article>
 
         <article class="surface-card">
-          <p class="text-lg font-semibold text-ink">Informasi flock</p>
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-lg font-semibold text-ink">Informasi kandang</p>
+            <div class="flex gap-2">
+              <RouterLink class="btn-secondary !py-2.5" :to="`/transfers?farmId=${flock.farm_id}`">
+                Mutasi
+              </RouterLink>
+              <RouterLink class="btn-secondary !py-2.5" :to="`/treatments?farmId=${flock.farm_id}&flockId=${flock.id}`">
+                Treatment
+              </RouterLink>
+            </div>
+          </div>
           <div class="mt-5 grid gap-3">
             <div class="rounded-3xl bg-slate-50 p-4">
               <p class="text-xs text-slate-500">House & vendor</p>
@@ -219,7 +229,7 @@ watch(dataVersion, () => {
                 </p>
               </div>
               <div class="rounded-2xl bg-slate-50 p-3">
-                <p class="text-xs text-slate-500">Mortalitas</p>
+                <p class="text-xs text-slate-500">Ayam mati</p>
                 <p class="font-semibold text-ink">
                   {{ formatNumber(log.mortality_count) }}
                 </p>
@@ -248,7 +258,7 @@ watch(dataVersion, () => {
         <EmptyState
           v-else
           title="Belum ada riwayat"
-          description="Isi log harian agar data performa flock mulai tercatat."
+            description="Isi log harian agar data performa kandang mulai tercatat."
         />
       </section>
 

@@ -31,15 +31,14 @@ async function submit() {
         </span>
 
         <h1 class="mt-4 max-w-xl text-4xl font-bold leading-tight">
-          Pantau pakan, mortalitas, populasi, produksi telur, dan bobot ayam
+          Pantau pakan, ayam mati, populasi, produksi telur, dan bobot ayam
           dalam satu dashboard sederhana.
         </h1>
 
         <p class="mt-4 max-w-2xl text-sm text-emerald-50/90">
           Aplikasi ini membantu pencatatan operasional harian peternakan secara
           praktis — mulai dari manajemen farm, kandang, dan flock, hingga
-          dashboard KPI, log harian, riwayat data, serta sinkronisasi otomatis
-          dengan Supabase.
+          dashboard KPI, log harian, riwayat data.
         </p>
         <!-- 
         <div class="mt-8 grid gap-4 sm:grid-cols-3">
@@ -51,9 +50,9 @@ async function submit() {
           </div>
           <div class="rounded-3xl bg-white/10 p-4">
             <p class="text-xs uppercase tracking-[0.18em] text-emerald-100">
-              Flock aktif
+              Kandang aktif
             </p>
-            <p class="mt-2 text-2xl font-bold">3 flock</p>
+            <p class="mt-2 text-2xl font-bold">3 kandang</p>
           </div>
           <div class="rounded-3xl bg-white/10 p-4">
             <p class="text-xs uppercase tracking-[0.18em] text-emerald-100">

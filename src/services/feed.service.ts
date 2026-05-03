@@ -1,5 +1,12 @@
 import { assertSupabaseConfigured, supabase } from '../lib/supabase'
-import type { FeedItem, FeedSummary, FeedTransaction, FeedUsageHistoryRow } from '../types/models'
+import type {
+  FeedItem,
+  FeedPurchase,
+  FeedSummary,
+  FeedSupplier,
+  FeedTransaction,
+  FeedUsageHistoryRow,
+} from '../types/models'
 import { bumpDataVersion } from '../lib/appState'
 import { getCurrentSession } from './auth.service'
 import { clearCache, withCache } from './localCache.service'
@@ -77,6 +84,13 @@ function getFeedStockStatus(estimatedStockDays: number | null, totalStockKg: num
   }
 
   return 'aman' as const
+}
+
+interface FeedSupplierRow extends FeedSupplier {}
+
+interface FeedPurchaseRow extends Omit<FeedPurchase, 'supplier' | 'feed_item'> {
+  feed_suppliers: Pick<FeedSupplier, 'id' | 'name' | 'contact_name' | 'payment_term_days'> | null
+  feed_items: Pick<FeedItem, 'id' | 'name' | 'brand' | 'unit'> | null
 }
 
 export function normalizeFeedUnitCost(unitCost: number | null, quantityKg: number) {
@@ -195,6 +209,64 @@ export async function listFeedTransactionsByFarm(farmId: string, limit = 25) {
       ...row,
       feed_item: row.feed_items ?? undefined,
     })) as FeedTransaction[]
+  })
+}
+
+export async function listFeedSuppliersByFarm(farmId: string) {
+  assertSupabaseConfigured()
+
+  return withCache(`feed-suppliers:${farmId}`, async () => {
+    const { data, error } = await supabase
+      .from('feed_suppliers')
+      .select('*')
+      .eq('farm_id', farmId)
+      .order('name')
+
+    if (error) {
+      throw error
+    }
+
+    return data as FeedSupplierRow[]
+  })
+}
+
+export async function listFeedPurchasesByFarm(farmId: string, limit = 25) {
+  assertSupabaseConfigured()
+
+  return withCache(`feed-purchases:${farmId}:${limit}`, async () => {
+    const { data, error } = await supabase
+      .from('feed_purchases')
+      .select(
+        `
+        *,
+        feed_suppliers (
+          id,
+          name,
+          contact_name,
+          payment_term_days
+        ),
+        feed_items (
+          id,
+          name,
+          brand,
+          unit
+        )
+      `,
+      )
+      .eq('farm_id', farmId)
+      .order('purchase_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      throw error
+    }
+
+    return (data as FeedPurchaseRow[]).map((row) => ({
+      ...row,
+      supplier: row.feed_suppliers ?? undefined,
+      feed_item: row.feed_items ?? undefined,
+    })) as FeedPurchase[]
   })
 }
 
@@ -386,7 +458,7 @@ export async function listFeedUsageHistoryByFarm(farmId: string, limit = 20) {
       id: row.id,
       flock_id: row.flock_id,
       flock_code: row.flocks[0]?.code ?? '-',
-      flock_name: row.flocks[0]?.name ?? 'Flock',
+      flock_name: row.flocks[0]?.name ?? 'Kandang',
       log_date: row.log_date,
       live_population: row.live_population,
       feed_used_kg: row.feed_used_kg,
@@ -404,7 +476,7 @@ export async function listFeedUsageHistoryByFarm(farmId: string, limit = 20) {
       id: log.id,
       flock_id: log.flock_id,
       flock_code: flockMap[log.flock_id]?.code ?? '-',
-      flock_name: flockMap[log.flock_id]?.name ?? 'Flock',
+      flock_name: flockMap[log.flock_id]?.name ?? 'Kandang',
       log_date: log.log_date,
       live_population: log.live_population,
       feed_used_kg: log.feed_used_kg,
@@ -474,6 +546,85 @@ export async function createFeedItem(input: {
   clearCache()
   bumpDataVersion()
   return data as FeedItem
+}
+
+export async function createFeedSupplier(input: {
+  farmId: string
+  name: string
+  contactName: string
+  phone: string
+  paymentTermDays: number
+  notes: string
+}) {
+  assertSupabaseConfigured()
+  const session = await getCurrentSession()
+  if (!session) {
+    throw new Error('Sesi pengguna tidak ditemukan')
+  }
+
+  const { data, error } = await supabase
+    .from('feed_suppliers')
+    .insert({
+      farm_id: input.farmId,
+      name: input.name.trim(),
+      contact_name: input.contactName.trim() || null,
+      phone: input.phone.trim() || null,
+      payment_term_days: input.paymentTermDays,
+      notes: input.notes.trim() || null,
+      created_by: session.user_id,
+    })
+    .select('*')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  clearCache()
+  bumpDataVersion()
+  return data as FeedSupplier
+}
+
+export async function createFeedPurchase(input: {
+  farmId: string
+  supplierId: string
+  feedItemId: string
+  invoiceNumber: string
+  purchaseDate: string
+  quantityKg: number
+  totalCostRp: number
+  paymentDueDate: string
+  notes: string
+}) {
+  assertSupabaseConfigured()
+
+  const { data, error } = await supabase.rpc('create_feed_purchase', {
+    p_farm_id: input.farmId,
+    p_supplier_id: input.supplierId,
+    p_feed_item_id: input.feedItemId,
+    p_invoice_number: input.invoiceNumber.trim() || null,
+    p_purchase_date: input.purchaseDate,
+    p_quantity_kg: input.quantityKg,
+    p_total_cost_rp: input.totalCostRp,
+    p_payment_due_date: input.paymentDueDate || null,
+    p_notes: input.notes.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  clearCache()
+  bumpDataVersion()
+
+  const purchases = await listFeedPurchasesByFarm(input.farmId, 50)
+  const createdPurchase = purchases.find((purchase) => purchase.id === data)
+
+  if (!createdPurchase) {
+    throw new Error('Pembelian berhasil disimpan, tetapi data terbaru belum tersedia')
+  }
+
+  return createdPurchase
 }
 
 export async function createFeedTransaction(input: {

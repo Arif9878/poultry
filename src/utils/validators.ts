@@ -52,18 +52,22 @@ export function validateDailyLog(
     errors.feed_price_per_kg_rp = feedPriceError
   }
 
-  const mortalityError = nonNegativeNumber(form.mortality_count, 'Mortalitas')
+  const mortalityError = nonNegativeNumber(form.mortality_count, 'Ayam mati')
   if (mortalityError) {
     errors.mortality_count = mortalityError
   } else if ((form.mortality_count ?? 0) > flock.current_chicken_count) {
-    errors.mortality_count = 'Mortalitas melebihi populasi saat ini'
+    errors.mortality_count = 'Ayam mati melebihi populasi saat ini'
   }
 
-  const livePopulationError = positiveNumber(form.live_population, 'Populasi hidup')
+  const livePopulationError = nonNegativeNumber(form.live_population, 'Populasi hidup')
   if (livePopulationError) {
     errors.live_population = livePopulationError
+  } else if ((form.live_population ?? 0) > flock.current_chicken_count) {
+    errors.live_population = 'Populasi hidup melebihi populasi kandang saat ini'
   } else if ((form.live_population ?? 0) > flock.initial_chicken_count) {
     errors.live_population = 'Populasi hidup melebihi populasi awal'
+  } else if ((form.live_population ?? 0) !== flock.current_chicken_count - (form.mortality_count ?? 0)) {
+    errors.live_population = 'Populasi hidup harus sama dengan populasi saat ini dikurangi ayam mati'
   }
 
   if (flock.flock_type === 'layer') {
